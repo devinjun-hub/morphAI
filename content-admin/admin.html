@@ -466,7 +466,13 @@ function toast(msg){ alert(msg); }
 function refreshPreview(){
   const frame=$('#previewFrame');
   try{
-    frame.contentWindow.postMessage({type:'morphai_reload'},'*');
+    // 直接把当前 DATA 发过去（blob URL 是短字符串，体积很小）
+    // base64 大图跳过（iframe 会用自己 localStorage 里的版本）
+    const payload=JSON.parse(JSON.stringify(DATA,(k,v)=>{
+      if(typeof v==='string'&&v.startsWith('data:image')&&v.length>4096)return '__skip__';
+      return v;
+    }));
+    frame.contentWindow.postMessage({type:'morphai_data',payload},'*');
   }catch(e){
     frame.src=`${PREVIEW_URL}?t=${Date.now()}`;
   }
@@ -476,9 +482,25 @@ function schedulePreview(){
   clearTimeout(previewTimer);
   previewTimer=setTimeout(()=>{
     persistSettings();
-    save(DATA);
+    try{save(DATA);}catch(e){}
     refreshPreview();
   },260);
+}
+
+// 将 blob: URL 转回 base64（保存/导出前调用）
+async function resolveBlobs(data){
+  const d=JSON.parse(JSON.stringify(data));
+  for(const p of d.projects||[]){
+    for(let i=0;i<(p.images||[]).length;i++){
+      if(p.images[i]&&p.images[i].startsWith('blob:')){
+        try{
+          const r=await fetch(p.images[i]);const b=await r.blob();
+          p.images[i]=await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=e=>res(e.target.result);fr.onerror=rej;fr.readAsDataURL(b)});
+        }catch(e){p.images[i]='';}
+      }
+    }
+  }
+  return d;
 }
 
 function renderSettings(){
@@ -594,14 +616,12 @@ function renderProjectThumbs(project,container){
 
 function addFilesToProject(files,project,container){
   Array.from(files||[]).forEach(file=>{
-    const reader=new FileReader();
-    reader.onload=e=>{
-      project.images.push(e.target.result);
-      project.labels.push(file.name.replace(/\.[^.]+$/,''));
-      if(container){renderProjectThumbs(project,container);updateThumbCount(container,project);}
-      schedulePreview();
-    };
-    reader.readAsDataURL(file);
+    // 用 blob URL 代替 base64：体积极小，不占 localStorage 配额，同源 iframe 可直接访问
+    const url=URL.createObjectURL(file);
+    project.images.push(url);
+    project.labels.push(file.name.replace(/\.[^.]+$/,''));
+    if(container){renderProjectThumbs(project,container);updateThumbCount(container,project);}
+    schedulePreview();
   });
 }
 
@@ -682,9 +702,10 @@ function persistSettings(){
   if(pw) DATA.pw=pw;
 }
 
-function exportJson(){
+async function exportJson(){
   persistSettings();
-  const blob=new Blob([JSON.stringify(normalize(DATA),null,2)],{type:'application/json'});
+  const d=await resolveBlobs(DATA);
+  const blob=new Blob([JSON.stringify(normalize(d),null,2)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
   a.download='morphai-content.json';
@@ -710,7 +731,15 @@ $('#password').addEventListener('keydown',e=>{ if(e.key==='Enter') $('#loginBtn'
 $('#backHome').addEventListener('click',()=>location.href='../index.html');
 $('#addJobBtn').addEventListener('click',()=>{ DATA.jobs.push({id:Date.now(),company:'新公司',role:'职位名称',year:'2026',desc:''}); renderJobs(); schedulePreview(); });
 $('#addProjectBtn').addEventListener('click',()=>{ DATA.projects.push({id:Date.now(),name:'新项目',sub:'New Project',cat:'',type:'',loc:'',year:'2026',scale:'',desc:'',images:[],labels:[]}); renderProjects(); schedulePreview(); });
-$('#saveBtn').addEventListener('click',()=>{ persistSettings(); save(DATA); refreshPreview(); toast('已保存并刷新预览'); });
+$('#saveBtn').addEventListener('click',async()=>{
+  persistSettings();
+  const d=await resolveBlobs(DATA);
+  // 把转好的 base64 写回 DATA，让后续操作也能用
+  d.projects.forEach((p,i)=>{if(DATA.projects[i])DATA.projects[i].images=p.images;});
+  save(d);
+  refreshPreview();
+  toast('已保存并刷新预览');
+});
 $('#exportBtn').addEventListener('click',exportJson);
 $('#importBtn').addEventListener('click',()=>$('#jsonInput').click());
 $('#refreshPreview').addEventListener('click',()=>{ persistSettings(); save(DATA); refreshPreview(); });
