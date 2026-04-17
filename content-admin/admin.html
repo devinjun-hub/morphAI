@@ -463,14 +463,30 @@ let autoPreview=true;
 let previewTimer=null;
 
 function toast(msg){ alert(msg); }
-async function refreshPreview(){
+
+// 上传时压缩：最大 1920px，JPEG 80%，通常 150-400 KB，localStorage/postMessage 都没压力
+function compressImage(file,maxW=1920,q=0.80){
+  return new Promise((res,rej)=>{
+    const img=new Image(), url=URL.createObjectURL(file);
+    img.onload=()=>{
+      URL.revokeObjectURL(url);
+      const scale=Math.min(1,maxW/Math.max(img.width,img.height));
+      const w=Math.round(img.width*scale), h=Math.round(img.height*scale);
+      const cv=document.createElement('canvas');
+      cv.width=w; cv.height=h;
+      cv.getContext('2d').drawImage(img,0,0,w,h);
+      res(cv.toDataURL('image/jpeg',q));
+    };
+    img.onerror=rej; img.src=url;
+  });
+}
+
+function refreshPreview(){
   const frame=$('#previewFrame');
   try{
-    // 先把 blob URL 转 base64（有缓存，重复调用很快）
-    // 已有的大 base64 跳过（iframe 用 localStorage 里的版本）
-    const resolved=await resolveBlobs(DATA);
-    const payload=JSON.parse(JSON.stringify(resolved,(k,v)=>{
-      if(typeof v==='string'&&v.startsWith('data:image')&&v.length>600000)return '__skip__';
+    // 压缩后的图片通常 <400KB，直接发；超大的旧图用 __skip__ 占位
+    const payload=JSON.parse(JSON.stringify(normalize(DATA),(k,v)=>{
+      if(typeof v==='string'&&v.startsWith('data:image')&&v.length>520000)return '__skip__';
       return v;
     }));
     frame.contentWindow.postMessage({type:'morphai_data',payload},'*');
@@ -481,30 +497,23 @@ async function refreshPreview(){
 function schedulePreview(){
   if(!autoPreview) return;
   clearTimeout(previewTimer);
-  previewTimer=setTimeout(async()=>{
+  previewTimer=setTimeout(()=>{
     persistSettings();
     try{save(DATA);}catch(e){}
-    await refreshPreview();
+    refreshPreview();
   },260);
 }
 
-// blob URL → base64 缓存（同一个 blob 只转一次）
-const _blobCache=new Map();
-async function blobToB64(url){
-  if(_blobCache.has(url))return _blobCache.get(url);
-  const r=await fetch(url);const b=await r.blob();
-  const b64=await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=e=>res(e.target.result);fr.onerror=rej;fr.readAsDataURL(b)});
-  _blobCache.set(url,b64);
-  return b64;
-}
-
-// 将 blob: URL 转回 base64（保存/导出前调用）
+// 导出前处理残余 blob URL（正常情况不应存在，保险用）
 async function resolveBlobs(data){
   const d=JSON.parse(JSON.stringify(data));
   for(const p of d.projects||[]){
     for(let i=0;i<(p.images||[]).length;i++){
       if(p.images[i]&&p.images[i].startsWith('blob:')){
-        try{p.images[i]=await blobToB64(p.images[i]);}catch(e){p.images[i]='';}
+        try{
+          const r=await fetch(p.images[i]);const b=await r.blob();
+          p.images[i]=await new Promise((rs,rj)=>{const fr=new FileReader();fr.onload=e=>rs(e.target.result);fr.onerror=rj;fr.readAsDataURL(b)});
+        }catch(e){p.images[i]='';}
       }
     }
   }
@@ -623,13 +632,14 @@ function renderProjectThumbs(project,container){
 }
 
 function addFilesToProject(files,project,container){
-  Array.from(files||[]).forEach(file=>{
-    // 用 blob URL 代替 base64：体积极小，不占 localStorage 配额，同源 iframe 可直接访问
-    const url=URL.createObjectURL(file);
-    project.images.push(url);
-    project.labels.push(file.name.replace(/\.[^.]+$/,''));
-    if(container){renderProjectThumbs(project,container);updateThumbCount(container,project);}
-    schedulePreview();
+  Array.from(files||[]).forEach(async file=>{
+    try{
+      const b64=await compressImage(file); // 压缩到 1920px JPEG 80%
+      project.images.push(b64);
+      project.labels.push(file.name.replace(/\.[^.]+$/,''));
+      if(container){renderProjectThumbs(project,container);updateThumbCount(container,project);}
+      schedulePreview();
+    }catch(e){console.error('图片压缩失败',e);}
   });
 }
 
