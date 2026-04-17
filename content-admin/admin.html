@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MORPHAI Content Admin</title>
+<style>
+:root{
+  --bg:#090b10;
+  --panel:#131720;
+  --panel-2:#0f131a;
+  --line:rgba(255,255,255,.08);
+  --text:#f4f6fb;
+  --muted:rgba(255,255,255,.58);
+  --soft:rgba(255,255,255,.18);
+  --accent:#98acff;
+  --danger:#ff8a8a;
+  --mono:ui-monospace,SFMono-Regular,Consolas,monospace;
+  --sans:Inter,"Segoe UI",system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{min-height:100%}
+body{
+  font-family:var(--sans);
+  background:radial-gradient(circle at 20% 0%,rgba(152,172,255,.08),transparent 26%),linear-gradient(180deg,#090b10,#0c1016);
+  color:var(--text);
+}
+button,input,textarea{font:inherit}
+button{cursor:pointer}
+a{text-decoration:none;color:inherit}
+.hidden{display:none!important}
+.login{
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+}
+.login-card{
+  width:min(440px,100%);
+  background:rgba(255,255,255,.03);
+  border:1px solid var(--line);
+  border-radius:24px;
+  padding:28px;
+  box-shadow:0 24px 80px rgba(0,0,0,.35);
+}
+.login-card h1{
+  font-size:clamp(34px,6vw,56px);
+  font-weight:800;
+  letter-spacing:-.05em;
+  margin-bottom:8px;
+}
+.login-card p{
+  color:var(--muted);
+  margin-bottom:18px;
+  line-height:1.7;
+}
+.login-card input{
+  width:100%;
+  background:#0d1118;
+  border:1px solid var(--line);
+  color:var(--text);
+  padding:14px 16px;
+  border-radius:14px;
+  margin-bottom:12px;
+}
+.layout{
+  display:grid;
+  grid-template-columns:minmax(0,1.1fr) minmax(420px,.9fr);
+  gap:18px;
+  max-width:1600px;
+  margin:0 auto;
+  padding:22px;
+}
+.editor,.preview{
+  min-width:0;
+}
+.topbar{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:16px;
+  margin-bottom:18px;
+}
+.title{
+  font-size:clamp(34px,4vw,66px);
+  font-weight:800;
+  line-height:.94;
+  letter-spacing:-.05em;
+}
+.sub{
+  margin-top:10px;
+  color:var(--muted);
+  font:12px var(--mono);
+  letter-spacing:2px;
+  text-transform:uppercase;
+}
+.actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  justify-content:flex-end;
+}
+.btn{
+  padding:12px 16px;
+  border-radius:14px;
+  border:1px solid var(--line);
+  background:#161b24;
+  color:var(--text);
+}
+.btn.primary{
+  background:#f3f5f8;
+  color:#0b0d11;
+  border-color:#f3f5f8;
+  font-weight:700;
+}
+.btn.ghost{background:transparent}
+.section{
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.03);
+  border-radius:22px;
+  padding:20px;
+  margin-bottom:18px;
+}
+.section h2{
+  font-size:24px;
+  margin-bottom:6px;
+}
+.section p{
+  color:var(--muted);
+  font-size:14px;
+  line-height:1.7;
+  margin-bottom:18px;
+}
+.form{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:14px;
+}
+.field{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.field.full{grid-column:1/-1}
+.field label{
+  font:11px var(--mono);
+  color:rgba(255,255,255,.66);
+  letter-spacing:1.6px;
+  text-transform:uppercase;
+}
+.field input,.field textarea{
+  width:100%;
+  background:#0e1218;
+  border:1px solid var(--line);
+  color:var(--text);
+  padding:12px 14px;
+  border-radius:14px;
+}
+.stack{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+.card{
+  border:1px solid var(--line);
+  background:var(--panel-2);
+  border-radius:18px;
+  padding:16px;
+}
+.card-head{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-bottom:14px;
+}
+.card-index{
+  font:11px var(--mono);
+  color:var(--muted);
+  letter-spacing:2px;
+}
+.card-head b{
+  font-size:16px;
+  line-height:1.2;
+}
+.spacer{margin-left:auto}
+.mini{
+  padding:8px 10px;
+  border-radius:10px;
+  border:1px solid var(--line);
+  background:#171c25;
+  color:var(--text);
+}
+.mini.danger{
+  color:var(--danger);
+  border-color:rgba(255,138,138,.22);
+}
+.helper{
+  color:var(--muted);
+  font-size:12px;
+  line-height:1.6;
+}
+.upload-box{
+  border:1px dashed rgba(255,255,255,.14);
+  border-radius:16px;
+  padding:14px;
+  background:rgba(255,255,255,.02);
+}
+.upload-top{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  align-items:center;
+  margin-bottom:12px;
+}
+.upload-input{
+  display:none;
+}
+.thumbs{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(120px,1fr));
+  gap:10px;
+}
+.thumb{
+  position:relative;
+  border:1px solid var(--line);
+  border-radius:14px;
+  overflow:hidden;
+  background:#0b0f14;
+}
+.thumb-media{
+  aspect-ratio:4/3;
+  width:100%;
+  object-fit:cover;
+  display:block;
+}
+.thumb-meta{
+  padding:8px;
+  border-top:1px solid var(--line);
+}
+.thumb-meta input{
+  width:100%;
+  background:#0d1118;
+  border:1px solid var(--line);
+  color:var(--text);
+  padding:7px 8px;
+  border-radius:10px;
+  font-size:12px;
+}
+.thumb-remove{
+  position:absolute;
+  top:8px;
+  right:8px;
+  width:28px;
+  height:28px;
+  border:none;
+  border-radius:999px;
+  background:rgba(0,0,0,.68);
+  color:#fff;
+}
+.preview-shell{
+  position:sticky;
+  top:22px;
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.03);
+  border-radius:22px;
+  overflow:hidden;
+  min-height:calc(100vh - 44px);
+}
+.preview-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  padding:16px 18px;
+  border-bottom:1px solid var(--line);
+  background:rgba(255,255,255,.02);
+}
+.preview-head h3{
+  font-size:16px;
+  letter-spacing:.02em;
+}
+.preview-head p{
+  color:var(--muted);
+  font-size:12px;
+}
+.preview-actions{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.preview-frame{
+  width:100%;
+  height:calc(100vh - 110px);
+  border:0;
+  background:#05070b;
+}
+.footer-note{
+  color:var(--muted);
+  font-size:12px;
+  margin-top:8px;
+}
+@media(max-width:1180px){
+  .layout{grid-template-columns:1fr}
+  .preview-shell{position:relative;top:auto;min-height:auto}
+  .preview-frame{height:70vh}
+}
+@media(max-width:720px){
+  .form{grid-template-columns:1fr}
+  .topbar{flex-direction:column}
+  .actions{justify-content:flex-start}
+}
+</style>
+</head>
+<body>
+<div class="login" id="loginView">
+  <div class="login-card">
+    <h1>Content Admin</h1>
+    <p>这个页面只负责内容维护。你可以在这里改文字、上传本地图片，并且右侧直接预览主站排版。</p>
+    <input id="password" type="password" placeholder="输入后台密码">
+    <button class="btn primary" id="loginBtn">进入后台</button>
+    <div class="footer-note"><a href="../index.html">返回主站</a></div>
+  </div>
+</div>
+
+<div class="layout hidden" id="adminView">
+  <div class="editor">
+    <div class="topbar">
+      <div>
+        <div class="title">MORPHAI Content<br>Admin</div>
+        <div class="sub">Local Content Editor · Upload Images · Live Layout Preview</div>
+      </div>
+      <div class="actions">
+        <button class="btn ghost" id="backHome">返回主站</button>
+        <button class="btn" id="exportBtn">导出 JSON</button>
+        <button class="btn" id="importBtn">导入 JSON</button>
+        <button class="btn" id="resetBtn">重置默认</button>
+        <button class="btn primary" id="saveBtn">保存全部</button>
+      </div>
+    </div>
+
+    <section class="section">
+      <h2>Site Settings</h2>
+      <p>这里修改全站基础文字。保存后，右侧主站预览会同步刷新。</p>
+      <div class="form">
+        <div class="field"><label>Email</label><input id="email"></div>
+        <div class="field"><label>Hero 大字</label><input id="hero"></div>
+        <div class="field full"><label>About 简介</label><textarea id="about" rows="5"></textarea></div>
+        <div class="field full"><label>Services（每行：中文 | English）</label><textarea id="services" rows="7"></textarea></div>
+        <div class="field"><label>Instagram</label><input id="instagram"></div>
+        <div class="field"><label>Behance</label><input id="behance"></div>
+        <div class="field"><label>LinkedIn</label><input id="linkedin"></div>
+        <div class="field"><label>新密码</label><input id="newPassword" type="password"></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Jobs</h2>
+      <p>这里维护工作经历，会直接影响首页右下和年限统计。</p>
+      <div class="stack" id="jobsList"></div>
+      <button class="btn" id="addJobBtn">+ 添加工作经历</button>
+    </section>
+
+    <section class="section">
+      <h2>Projects</h2>
+      <p>这里维护项目内容。你现在可以直接上传本地图片，并在下方看到缩略图预览和标注。</p>
+      <div class="stack" id="projectsList"></div>
+      <button class="btn" id="addProjectBtn">+ 添加项目</button>
+    </section>
+  </div>
+
+  <aside class="preview">
+    <div class="preview-shell">
+      <div class="preview-head">
+        <div>
+          <h3>Layout Preview</h3>
+          <p>这里显示主站真实排版。保存或开启自动预览后会同步刷新。</p>
+        </div>
+        <div class="preview-actions">
+          <button class="btn" id="toggleAutoPreview">自动预览：开</button>
+          <button class="btn" id="refreshPreview">刷新预览</button>
+        </div>
+      </div>
+      <iframe class="preview-frame" id="previewFrame" src="../index.html"></iframe>
+    </div>
+  </aside>
+
+  <input id="jsonInput" type="file" accept="application/json" class="hidden">
+</div>
+
+<script>
+const STORAGE_KEY='lj_portfolio_v8';
+const PREVIEW_URL='../index.html';
+const DEFAULT_DATA={
+  pw:'liu2025',
+  email:'ljyyshxq@163.com',
+  ht:'MORPH',
+  startYear:2016,
+  ab:'10年展览展示设计经验，3年海外展会项目积累。服务过 Medtronic、Henkel、Merck、BASF、Valeo 等国际品牌，独立主导从概念创意、空间叙事到施工落地的全流程。同时深度融合 AIGC 工具构建设计工作流，用 ComfyUI、Stable Diffusion、Midjourney 驱动方案推演与效果生成——这是我认为展览设计在当下最有力的进化方向。',
+  svcs:'创意主导 | Creative Direction
+AIGC 驱动设计流程 | AI-Augmented Workflow
+跨部门协同推进 | Cross-Functional Delivery
+项目全流程跟进 | End-to-End Execution
+国际展会设计 | International Exhibition Design
+品牌空间表达 | Brand Spatial Experience',
+  ig:'',
+  be:'',
+  li:'',
+  jobs:[
+    {id:1,company:'上海瑞马展览有限公司',role:'展览展示空间设计师',year:'2023.09 — 至今',desc:'主导创意型展会、舞台活动及展厅项目的整体设计工作，从品牌需求、空间结构与商业逻辑出发输出高价值方案，引入 AIGC 工具优化设计流程，推动设计与制作团队高效协同落地。'},
+    {id:2,company:'上海嵩穆迪公关策划有限公司',role:'3D 设计师',year:'2022.08 — 2023.09',desc:'负责医疗及国际品牌展示项目的核心创意设计与视觉策略，深度参与客户沟通与需求拆解，服务客户包括 Medtronic、Henkel、Merck、BASF 等国际品牌。'},
+    {id:3,company:'上海狄普展览设计有限公司',role:'3D 设计师',year:'2018.01 — 2022.01',desc:'主导公司外展展示项目的创意设计与全流程推进，累计完成 10+ 大型展览项目，客户满意度达 95% 以上，多个项目获行业奖项提名。'},
+    {id:4,company:'拓展会展（上海）有限公司',role:'三维 / CAD / 制图',year:'2016.01 — 2018.01',desc:'负责展台与展厅三维设计制图，参与设计前期讨论、方向引导与后期施工搭建配合，确保方案从设计到实施的一致性。'}
+  ],
+  projects:[
+    {id:1,name:'加农进博会',sub:'CIIE · Canon',cat:'Expo · International',type:'国际展会展台',loc:'上海',year:'2025',scale:'设计师',desc:'大型国际展会参展方案，在高标准场馆环境下完成品牌展示空间设计，确保动线逻辑与品牌叙事的统一表达。',images:['images/2025加农进博会/10_PhysCamera001.jpg','images/2025加农进博会/10_PhysCamera003.jpg','images/2025加农进博会/10_PhysCamera004.jpg','images/2025加农进博会/10_PhysCamera007.jpg','images/2025加农进博会/10_PhysCamera008.jpg','images/2025加农进博会/10_PhysCamera010.jpg','images/2025加农进博会/10_Camera001.jpg','images/2025加农进博会/10_Camera003.jpg'],labels:['主视角','展台透视','品牌展示面','核心展示区','洽谈区','入口空间','概念视角 A','概念视角 B']},
+    {id:2,name:'HRC 进博会',sub:'CIIE · HRC',cat:'Expo · International',type:'国际展会展台',loc:'上海',year:'2025',scale:'设计师',desc:'HRC 品牌进博会参展方案，在标准化场馆条件下强化品牌识别度与空间层次感。',images:['images/2025HRC进博会/01_PhysCamera001.jpg','images/2025HRC进博会/01_PhysCamera004.jpg','images/2025HRC进博会/01_PhysCamera005.jpg','images/2025HRC进博会/01_PhysCamera006.jpg','images/2025HRC进博会/01_PhysCamera007.jpg','images/2025HRC进博会/01_PhysCamera008.jpg','images/2025HRC进博会/01_PhysCamera009.jpg'],labels:['主视角','入口空间','品牌展示面','洽谈区','开放动线','功能区','结构细节']},
+    {id:3,name:'芬琳大师漆广州设计周',sub:'Finlux · Guangzhou Design Week',cat:'Design · Creative',type:'创意竞标提案',loc:'广州',year:'2025',scale:'主案设计师',desc:'以鲜明的空间母题和视觉焦点建立提案记忆点，在高创意要求场景中实现方案中标，体现创意表达与商业价值转化能力。',images:['images/2025芬琳大师漆广州设计周/01_PhysCamera001.jpg','images/2025芬琳大师漆广州设计周/01_PhysCamera004.jpg','images/2025芬琳大师漆广州设计周/01_PhysCamera007.jpg','images/2025芬琳大师漆广州设计周/01_PhysCamera012.jpg','images/2025芬琳大师漆广州设计周/01_PhysCamera018.jpg','images/2025芬琳大师漆广州设计周/01_PhysCamera028.jpg','images/2025芬琳大师漆广州设计周/01_PhysCamera036.jpg','images/2025芬琳大师漆广州设计周/01_PhysCamera040.jpg'],labels:['入口主视角','主展面','品牌装置区','中庭空间','动线转折','功能展示区','灯光氛围','整体收尾视角']},
+    {id:4,name:'华海医药 CPhI',sub:'Huahai Pharma · CPhI',cat:'Pharma · Exhibition',type:'国际医药展台',loc:'上海',year:'2025',scale:'设计师',desc:'负责医药品牌展台的设计深化与施工图输出，现场逐一解决执行问题，保障还原度与交付质量。',images:['images/2025华海医药cphi/View01_01.jpg','images/2025华海医药cphi/View03_01.jpg','images/2025华海医药cphi/View05_01.jpg','images/2025华海医药cphi/View07_01.jpg','images/2025华海医药cphi/View010_01.jpg','images/2025华海医药cphi/08_PhysCamera008.jpg','images/2025华海医药cphi/08_PhysCamera012.jpg','images/2025华海医药cphi/pingmian.jpg'],labels:['主视图','品牌展示面','洽谈区视角','开放动线','结构细节','空间透视 A','空间透视 B','平面规划']},
+    {id:5,name:'华域车展',sub:'Huayu · Auto Show',cat:'Auto · Exhibition',type:'国际车展展台',loc:'上海',year:'2025',scale:'主案设计师',desc:'汽车零部件品牌车展方案，通过空间结构与品牌动线的精准把控，实现高辨识度的展台视觉表达。',images:['images/2025华域车展/15-01_PhysCamera001.jpg','images/2025华域车展/15-01_PhysCamera002.jpg','images/2025华域车展/15-01_PhysCamera003.jpg','images/2025华域车展/15-01_PhysCamera005.jpg','images/2025华域车展/15-01_PhysCamera007.jpg','images/2025华域车展/15-01_PhysCamera009.jpg','images/2025华域车展/15-01_PhysCamera011.jpg','images/2025华域车展/15-01_PhysCamera013.jpg'],labels:['主视角','入口空间','品牌展示面','产品展示区','洽谈区','动线视角','结构细节','全局视角']},
+    {id:6,name:'HRC 车展',sub:'HRC · Auto Show',cat:'Auto · Exhibition',type:'车展展台',loc:'上海',year:'2025',scale:'主案设计师',desc:'HRC 品牌车展展台，强调产品展示逻辑与空间动线，在竞争激烈的场馆环境中打造品牌差异化。',images:['images/2025HRC车展/01_PhysCamera001.jpg','images/2025HRC车展/01_PhysCamera002.jpg','images/2025HRC车展/01_PhysCamera003.jpg','images/2025HRC车展/01_PhysCamera005.jpg','images/2025HRC车展/01_PhysCamera007.jpg','images/2025HRC车展/01_PhysCamera008.jpg','images/2025HRC车展/01_PhysCamera013.jpg'],labels:['主视角','入口空间','品牌立面','产品展示区','洽谈区','动线视角','结构细节']},
+    {id:7,name:'倍适登汽配展',sub:'Bestune · Auto Parts Show',cat:'Auto Parts · Exhibition',type:'汽配展台',loc:'上海',year:'2025',scale:'主案设计师',desc:'汽配行业展台方案，注重工业品牌专业质感与产品展示效率，在标准展位中创造超出预期的视觉层次。',images:['images/2025倍适登汽配展/01_PhysCamera001.jpg','images/2025倍适登汽配展/01_PhysCamera002.jpg','images/2025倍适登汽配展/01_PhysCamera003.jpg','images/2025倍适登汽配展/01_PhysCamera005.jpg','images/2025倍适登汽配展/01_PhysCamera007.jpg','images/2025倍适登汽配展/01_PhysCamera008.jpg','images/2025倍适登汽配展/01_PhysCamera010.jpg'],labels:['主视角','入口空间','品牌展示面','产品展示区','洽谈区','动线视角','全局视角']},
+    {id:8,name:'海蒂诗家具展',sub:'Hettich · Furniture Exhibition',cat:'Furniture · Exhibition',type:'家具展台',loc:'上海',year:'2025',scale:'主案设计师',desc:'欧洲五金品牌家具展台，结合品牌调性与产品特性，在展示空间中传递专业工艺与生活美学的双重价值。',images:['images/2025海蒂诗家具展/01_PhysCamera001.jpg','images/2025海蒂诗家具展/01_PhysCamera003.jpg','images/2025海蒂诗家具展/01_PhysCamera005.jpg','images/2025海蒂诗家具展/01_PhysCamera007.jpg','images/2025海蒂诗家具展/01_PhysCamera009.jpg','images/2025海蒂诗家具展/01_PhysCamera012.jpg','images/2025海蒂诗家具展/01_PhysCamera016.jpg','images/2025海蒂诗家具展/01_PhysCamera020.jpg'],labels:['主视角','入口空间','品牌展示面','产品展示区','洽谈区','动线视角','细节展示','全局视角']},
+    {id:9,name:'莱克 AWE',sub:'Lexy · AWE Appliance Expo',cat:'Home Appliance · Exhibition',type:'家电展台',loc:'上海',year:'2026',scale:'主案设计师',desc:'AWE 家电博览会展台，以科技感与未来感为基调，构建符合消费品牌调性的沉浸式体验空间。',images:['images/2026莱克AWE/01_00-00.jpg','images/2026莱克AWE/01_PhysCamera001.jpg','images/2026莱克AWE/01_PhysCamera002.jpg','images/2026莱克AWE/01_PhysCamera004.jpg','images/2026莱克AWE/01_PhysCamera006.jpg','images/2026莱克AWE/01_PhysCamera008.jpg','images/2026莱克AWE/01_PhysCamera012.jpg','images/2026莱克AWE/鸟瞰图.jpg'],labels:['概念方案','主视角','入口空间','品牌展示面','产品区','体验区','动线视角','鸟瞰全景']},
+    {id:10,name:'和咖酒店用品展',sub:'Coffee Jack · Hospitality Show',cat:'Hospitality · Exhibition',type:'酒店用品展台',loc:'上海',year:'2026',scale:'主案设计师',desc:'酒店用品行业品牌展台，在专业展会环境中平衡商业展示效率与品牌文化体验，构建有温度的空间叙事。',images:['images/2026和咖酒店用品展/01_PhysCamera001.jpg','images/2026和咖酒店用品展/01_PhysCamera003.jpg','images/2026和咖酒店用品展/01_PhysCamera005.jpg','images/2026和咖酒店用品展/01_PhysCamera007.jpg','images/2026和咖酒店用品展/01_PhysCamera010.jpg','images/2026和咖酒店用品展/01_PhysCamera012.jpg','images/2026和咖酒店用品展/01_PhysCamera015.jpg','images/2026和咖酒店用品展/01_PhysCamera018.jpg'],labels:['主视角','入口空间','品牌展示面','产品展示区','洽谈区','细节展示','动线视角','全局视角']}
+  ]
+};
+const $=s=>document.querySelector(s);
+const clone=o=>JSON.parse(JSON.stringify(o));
+const escapeHtml=s=>String(s||'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+const isLegacyTemplate=d=>{
+  if(!d||!Array.isArray(d.projects)) return false;
+  if(d.projects.length!==1) return false;
+  const p=d.projects[0]||{};
+  const n=String(p.name||'').trim();
+  const a=String(d.ab||'').trim();
+  return (!Array.isArray(p.images) || p.images.length===0) && (n==='项目名称' || /Project Subtitle/i.test(String(p.sub||'')) || /About/i.test(a));
+};
+const normalize=d=>{
+  const next=Object.assign(clone(DEFAULT_DATA),d||{});
+  next.jobs=Array.isArray(next.jobs)?next.jobs:[];
+  next.projects=Array.isArray(next.projects)?next.projects:[];
+  next.jobs=next.jobs.map((j,i)=>Object.assign({id:Date.now()+i,company:'新公司',role:'职位名称',year:'2026',desc:''},j||{}));
+  next.projects=next.projects.map((p,i)=>Object.assign({id:Date.now()+i,name:'新项目',sub:'New Project',cat:'',type:'',loc:'',year:'2026',scale:'',desc:'',images:[],labels:[]},p||{},{
+    images:Array.isArray(p&&p.images)?p.images:[],
+    labels:Array.isArray(p&&p.labels)?p.labels:[]
+  }));
+  return next;
+};
+const load=()=>{
+  try{
+    const raw=localStorage.getItem(STORAGE_KEY);
+    if(!raw) return normalize(DEFAULT_DATA);
+    const parsed=JSON.parse(raw);
+    return isLegacyTemplate(parsed)?normalize(DEFAULT_DATA):normalize(parsed);
+  }catch{
+    return normalize(DEFAULT_DATA);
+  }
+};
+const save=data=>localStorage.setItem(STORAGE_KEY,JSON.stringify(normalize(data)));
+
+let DATA=load();
+let autoPreview=true;
+let previewTimer=null;
+
+function toast(msg){ alert(msg); }
+function refreshPreview(){ $('#previewFrame').src=`${PREVIEW_URL}?preview=${Date.now()}`; }
+function schedulePreview(){
+  if(!autoPreview) return;
+  clearTimeout(previewTimer);
+  previewTimer=setTimeout(()=>{
+    persistSettings();
+    save(DATA);
+    refreshPreview();
+  },260);
+}
+
+function renderSettings(){
+  $('#email').value=DATA.email||'';
+  $('#hero').value=DATA.ht||'';
+  $('#about').value=DATA.ab||'';
+  $('#services').value=DATA.svcs||'';
+  $('#instagram').value=DATA.ig||'';
+  $('#behance').value=DATA.be||'';
+  $('#linkedin').value=DATA.li||'';
+  $('#newPassword').value='';
+}
+
+function renderJobs(){
+  const el=$('#jobsList');
+  el.innerHTML='';
+  DATA.jobs.forEach((job,index)=>{
+    const card=document.createElement('div');
+    card.className='card';
+    card.innerHTML=`
+      <div class="card-head">
+        <span class="card-index">${String(index+1).padStart(2,'0')}</span>
+        <b>${escapeHtml(job.company||'未命名经历')}</b>
+        <div class="spacer"></div>
+        <button class="mini" data-act="up">上移</button>
+        <button class="mini" data-act="down">下移</button>
+        <button class="mini danger" data-act="delete">删除</button>
+      </div>
+      <div class="form">
+        <div class="field"><label>公司名称</label><input data-key="company" value="${escapeHtml(job.company||'')}"></div>
+        <div class="field"><label>职位</label><input data-key="role" value="${escapeHtml(job.role||'')}"></div>
+        <div class="field"><label>时间</label><input data-key="year" value="${escapeHtml(job.year||'')}"></div>
+        <div class="field full"><label>经历描述</label><textarea rows="4" data-key="desc">${escapeHtml(job.desc||'')}</textarea></div>
+      </div>
+    `;
+    card.querySelectorAll('[data-key]').forEach(input=>{
+      input.addEventListener('input',()=>{
+        job[input.dataset.key]=input.value;
+        if(input.dataset.key==='company'){
+          card.querySelector('b').textContent=input.value||'未命名经历';
+        }
+        schedulePreview();
+      });
+    });
+    card.querySelector('[data-act="up"]').addEventListener('click',()=>{ if(index>0){ [DATA.jobs[index-1],DATA.jobs[index]]=[DATA.jobs[index],DATA.jobs[index-1]]; renderJobs(); schedulePreview(); } });
+    card.querySelector('[data-act="down"]').addEventListener('click',()=>{ if(index<DATA.jobs.length-1){ [DATA.jobs[index+1],DATA.jobs[index]]=[DATA.jobs[index],DATA.jobs[index+1]]; renderJobs(); schedulePreview(); } });
+    card.querySelector('[data-act="delete"]').addEventListener('click',()=>{ DATA.jobs.splice(index,1); renderJobs(); schedulePreview(); });
+    el.appendChild(card);
+  });
+}
+
+function renderProjectThumbs(project, container){
+  container.innerHTML='';
+  (project.images||[]).forEach((src,index)=>{
+    const item=document.createElement('div');
+    item.className='thumb';
+    const label=(project.labels&&project.labels[index])||'';
+    item.innerHTML=`
+      <img class="thumb-media" src="${src}" alt="">
+      <button class="thumb-remove" type="button">×</button>
+      <div class="thumb-meta"><input value="${escapeHtml(label)}" placeholder="图片标注"></div>
+    `;
+    item.querySelector('.thumb-remove').addEventListener('click',()=>{
+      project.images.splice(index,1);
+      project.labels.splice(index,1);
+      renderProjects();
+      schedulePreview();
+    });
+    item.querySelector('input').addEventListener('input',e=>{
+      project.labels[index]=e.target.value;
+      schedulePreview();
+    });
+    container.appendChild(item);
+  });
+}
+
+function addFilesToProject(files, project){
+  Array.from(files||[]).forEach(file=>{
+    const reader=new FileReader();
+    reader.onload=e=>{
+      project.images.push(e.target.result);
+      project.labels.push(file.name.replace(/\.[^.]+$/,''));
+      renderProjects();
+      schedulePreview();
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderProjects(){
+  const el=$('#projectsList');
+  el.innerHTML='';
+  DATA.projects.forEach((project,index)=>{
+    const card=document.createElement('div');
+    card.className='card';
+    card.innerHTML=`
+      <div class="card-head">
+        <span class="card-index">${String(index+1).padStart(2,'0')}</span>
+        <b>${escapeHtml(project.name||'未命名项目')}</b>
+        <span class="helper">图片 ${String((project.images||[]).length).padStart(2,'0')} 张</span>
+        <div class="spacer"></div>
+        <button class="mini" data-act="up">上移</button>
+        <button class="mini" data-act="down">下移</button>
+        <button class="mini danger" data-act="delete">删除</button>
+      </div>
+      <div class="form">
+        <div class="field"><label>项目名称</label><input data-key="name" value="${escapeHtml(project.name||'')}"></div>
+        <div class="field"><label>Project Subtitle</label><input data-key="sub" value="${escapeHtml(project.sub||'')}"></div>
+        <div class="field"><label>分类标签</label><input data-key="cat" value="${escapeHtml(project.cat||'')}"></div>
+        <div class="field"><label>类型</label><input data-key="type" value="${escapeHtml(project.type||'')}"></div>
+        <div class="field"><label>地点</label><input data-key="loc" value="${escapeHtml(project.loc||'')}"></div>
+        <div class="field"><label>年份</label><input data-key="year" value="${escapeHtml(project.year||'')}"></div>
+        <div class="field"><label>角色 / 规模</label><input data-key="scale" value="${escapeHtml(project.scale||'')}"></div>
+        <div class="field full"><label>项目简介</label><textarea rows="4" data-key="desc">${escapeHtml(project.desc||'')}</textarea></div>
+        <div class="field full">
+          <label>本地上传图片 + 缩略预览</label>
+          <div class="upload-box">
+            <div class="upload-top">
+              <label class="btn" for="upload-${index}">选择本地图片</label>
+              <input class="upload-input" id="upload-${index}" type="file" accept="image/*" multiple>
+              <div class="helper">上传后会直接显示缩略图，并参与右侧主站排版预览。</div>
+            </div>
+            <div class="thumbs" id="thumbs-${index}"></div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    card.querySelectorAll('[data-key]').forEach(input=>{
+      input.addEventListener('input',()=>{
+        project[input.dataset.key]=input.value;
+        if(input.dataset.key==='name'){
+          card.querySelector('b').textContent=input.value||'未命名项目';
+        }
+        schedulePreview();
+      });
+    });
+
+    card.querySelector('[data-act="up"]').addEventListener('click',()=>{ if(index>0){ [DATA.projects[index-1],DATA.projects[index]]=[DATA.projects[index],DATA.projects[index-1]]; renderProjects(); schedulePreview(); } });
+    card.querySelector('[data-act="down"]').addEventListener('click',()=>{ if(index<DATA.projects.length-1){ [DATA.projects[index+1],DATA.projects[index]]=[DATA.projects[index],DATA.projects[index+1]]; renderProjects(); schedulePreview(); } });
+    card.querySelector('[data-act="delete"]').addEventListener('click',()=>{ DATA.projects.splice(index,1); renderProjects(); schedulePreview(); });
+    card.querySelector(`#upload-${index}`).addEventListener('change',e=>addFilesToProject(e.target.files,project));
+
+    el.appendChild(card);
+    renderProjectThumbs(project, card.querySelector(`#thumbs-${index}`));
+  });
+}
+
+function renderAll(){
+  renderSettings();
+  renderJobs();
+  renderProjects();
+}
+
+function persistSettings(){
+  DATA.email=$('#email').value.trim();
+  DATA.ht=$('#hero').value.trim();
+  DATA.ab=$('#about').value;
+  DATA.svcs=$('#services').value;
+  DATA.ig=$('#instagram').value.trim();
+  DATA.be=$('#behance').value.trim();
+  DATA.li=$('#linkedin').value.trim();
+  const pw=$('#newPassword').value.trim();
+  if(pw) DATA.pw=pw;
+}
+
+function exportJson(){
+  persistSettings();
+  const blob=new Blob([JSON.stringify(normalize(DATA),null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='morphai-content.json';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },100);
+}
+
+$('#loginBtn').addEventListener('click',()=>{
+  const data=load();
+  if($('#password').value===data.pw){
+    DATA=data;
+    $('#loginView').classList.add('hidden');
+    $('#adminView').classList.remove('hidden');
+    renderAll();
+    refreshPreview();
+  }else{
+    toast('密码错误');
+  }
+});
+
+$('#password').addEventListener('keydown',e=>{ if(e.key==='Enter') $('#loginBtn').click(); });
+$('#backHome').addEventListener('click',()=>location.href='../index.html');
+$('#addJobBtn').addEventListener('click',()=>{ DATA.jobs.push({id:Date.now(),company:'新公司',role:'职位名称',year:'2026',desc:''}); renderJobs(); schedulePreview(); });
+$('#addProjectBtn').addEventListener('click',()=>{ DATA.projects.push({id:Date.now(),name:'新项目',sub:'New Project',cat:'',type:'',loc:'',year:'2026',scale:'',desc:'',images:[],labels:[]}); renderProjects(); schedulePreview(); });
+$('#saveBtn').addEventListener('click',()=>{ persistSettings(); save(DATA); refreshPreview(); toast('已保存并刷新预览'); });
+$('#exportBtn').addEventListener('click',exportJson);
+$('#importBtn').addEventListener('click',()=>$('#jsonInput').click());
+$('#refreshPreview').addEventListener('click',()=>{ persistSettings(); save(DATA); refreshPreview(); });
+$('#toggleAutoPreview').addEventListener('click',()=>{
+  autoPreview=!autoPreview;
+  $('#toggleAutoPreview').textContent=`自动预览：${autoPreview?'开':'关'}`;
+  if(autoPreview){
+    persistSettings();
+    save(DATA);
+    refreshPreview();
+  }
+});
+$('#jsonInput').addEventListener('change',e=>{
+  const file=e.target.files&&e.target.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      DATA=normalize(JSON.parse(ev.target.result));
+      save(DATA);
+      renderAll();
+      refreshPreview();
+      toast('JSON 导入成功');
+    }catch{
+      toast('JSON 文件格式不正确');
+    }
+  };
+  reader.readAsText(file,'utf-8');
+  e.target.value='';
+});
+$('#resetBtn').addEventListener('click',()=>{
+  if(confirm('确定重置为默认模板吗？')){
+    DATA=normalize(DEFAULT_DATA);
+    save(DATA);
+    renderAll();
+    refreshPreview();
+    toast('已重置');
+  }
+});
+
+['#email','#hero','#about','#services','#instagram','#behance','#linkedin','#newPassword'].forEach(sel=>{
+  const el=$(sel);
+  if(el) el.addEventListener('input',schedulePreview);
+});
+</script>
+</body>
+</html>
