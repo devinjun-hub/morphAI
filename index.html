@@ -306,217 +306,148 @@ let tx=0,ty=0; document.addEventListener('pointermove',e=>{tx=e.clientX;ty=e.cli
     x.strokeText(txt,tcx,tcy);
 
     // ================================================================
-    // LAYER 4: TETRAHEDRON GEOMETRY (apex up, tapered, wider for lens effect).
+    // LAYER 4: TETRAHEDRON — solid glowing crystal (ALCHE-style)
     // ================================================================
-    // Heavy, tapered, apex high. Four vertices, four triangular faces.
-    const pulse=1+Math.sin(t*.45)*.012;
+    const pulse=1+Math.sin(t*.45)*.018;
     const verts=[
-      [0, -u*1.30*pulse, 0],           // apex
-      [-u*.96, u*.80, -u*.66],         // base A
-      [ u*1.02, u*.86, -u*.52],        // base B
-      [ 0, u*.28, u*1.16]              // base C (forward)
+      [0, -u*1.30*pulse, 0],
+      [-u*.96, u*.80, -u*.66],
+      [ u*1.02, u*.86, -u*.52],
+      [ 0, u*.28, u*1.16]
     ];
     const P=verts.map(([X,Y,Z])=>pr(X,Y,Z,H.rx,H.ry,H.rz));
-    const faceIdx=[[0,2,1],[0,3,2],[0,1,3],[1,2,3]]; // CCW from outside
-
-    // ---- CAST SHADOW ----
-    const shC=pr(0,u*.72,0,H.rx,H.ry,H.rz);
-    const gs=x.createRadialGradient(shC.x,shC.y+u*.5,0,shC.x,shC.y+u*.5,u*1.45);
-    gs.addColorStop(0,'rgba(0,0,0,.56)');
-    gs.addColorStop(.6,'rgba(0,0,0,.18)');
-    gs.addColorStop(1,'rgba(0,0,0,0)');
-    x.fillStyle=gs;
-    x.beginPath();x.ellipse(shC.x,shC.y+u*.58,u*1.15,u*.26,0,0,Math.PI*2);x.fill();
-
-    // ---- CAUSTIC: focal light pool on the floor behind the crystal ----
-    // Moves with rotation — gives the sense that the crystal is focusing light.
-    const cauX=W/2 + Math.sin(H.ry*1.2)*u*.42;
-    const cauY=Hh*.78 + Math.sin(H.rx*.8)*u*.12;
-    const cau=x.createRadialGradient(cauX,cauY,0,cauX,cauY,u*.92);
-    cau.addColorStop(0,`rgba(${metal.r},${metal.g},${metal.b},.55)`);
-    cau.addColorStop(.35,hsl(hBase+40,82,62,.3));
-    cau.addColorStop(.7,hsl(hBase+80,72,46,.08));
-    cau.addColorStop(1,'rgba(0,0,0,0)');
-    x.save();
-    x.globalCompositeOperation='screen';
-    x.fillStyle=cau;
-    x.beginPath();x.ellipse(cauX,cauY,u*.9,u*.34,0,0,Math.PI*2);x.fill();
-    x.restore();
-
-    // Precompute face metadata: normal, ndotv (fresnel), lambert, etc.
-    const viewVec=[0,0,-1];
-    const lightVec=norm([.42+(m.x-.5)*.6, -.72+(m.y-.5)*.25, -.55]);
+    const faceIdx=[[0,2,1],[0,3,2],[0,1,3],[1,2,3]];
     const edges=[[0,1],[0,2],[0,3],[1,2],[2,3],[3,1]];
 
-    const sorted=faceIdx.map((idx,i)=>{
+    const lightVec=norm([.42+(m.x-.5)*.6, -.72+(m.y-.5)*.25, -.55]);
+
+    const sorted=faceIdx.map((idx,fi)=>{
       const ws=idx.map(k=>P[k].ws);
       const scr=idx.map(k=>P[k]);
       const z=(ws[0].z+ws[1].z+ws[2].z)/3;
       const n=norm(cross(sub(ws[1],ws[0]),sub(ws[2],ws[0])));
-      const ndotv=Math.max(0,-n[2]);          // camera looks down -Z
+      const ndotv=Math.max(0,-n[2]);
       const lam=Math.max(0,dot(n,lightVec));
-      const fres=Math.pow(1-ndotv,2.2);        // grazing faces: fres → 1
-      return{ws,scr,z,i,n,ndotv,lam,fres};
+      const fres=Math.pow(1-ndotv,2.2);
+      return{ws,scr,z,fi,n,ndotv,lam,fres};
     }).sort((a,b)=>a.z-b.z);
 
-    // ================================================================
-    // LAYER 4.5: INNER EDGE WIREFRAME — drawn BEFORE faces so that
-    //            translucent faces reveal the "back of the crystal"
-    //            showing through the front. This is the key "see through
-    //            glass volume" cue that was missing.
-    // ================================================================
-    x.save();
-    x.globalCompositeOperation='screen';
-    x.lineCap='round';
-    x.lineWidth=.8;
-    x.strokeStyle=`rgba(${metal.r},${metal.g},${metal.b},.35)`;
-    edges.forEach(([a,b])=>{
-      x.beginPath();x.moveTo(P[a].x,P[a].y);x.lineTo(P[b].x,P[b].y);x.stroke();
+    // ---- outer glow halo ----
+    const glowR=u*2.2;
+    const innerBeat=1+Math.sin(t*.8)*.06;
+    // two-pass glow: wide soft outer + tighter bright inner
+    [[glowR*1.4,.28],[glowR*.7,.55]].forEach(([r,alpha])=>{
+      const gw=x.createRadialGradient(W/2,Hh*.5,u*.15,W/2,Hh*.5,r*innerBeat);
+      gw.addColorStop(0,`rgba(${metal.r},${metal.g},${metal.b},${alpha})`);
+      gw.addColorStop(.35,`rgba(80,120,255,${alpha*.55})`);
+      gw.addColorStop(.7,`rgba(40,60,180,${alpha*.18})`);
+      gw.addColorStop(1,'rgba(0,0,0,0)');
+      x.save();x.globalCompositeOperation='screen';
+      x.fillStyle=gw;x.beginPath();x.arc(W/2,Hh*.5,r*innerBeat,0,Math.PI*2);x.fill();
+      x.restore();
     });
-    x.restore();
 
-    // ================================================================
-    // LAYER 5: CRYSTAL FACES — translucent glass + magnified chromatic
-    //          text + specular streak + Fresnel-driven color.
-    // ================================================================
-    const dispOff=6 + H.noiseScale*.55;      // chromatic split strength
-    const refracOff=4 + (1-H.roughness)*16;  // apparent refraction shift
-    // Full spectrum stops (R, O, Y, G, C, B, V) for the prismatic edge ribbon.
-    const spectrum=[[255,70,90],[255,150,70],[255,235,90],[90,255,140],[70,220,255],[90,140,255],[200,100,255]];
-
+    // ---- solid faces: deep navy base + bright interior light ----
     sorted.forEach(f=>{
       const p=f.scr;
       const path=new Path2D();
       path.moveTo(p[0].x,p[0].y);path.lineTo(p[1].x,p[1].y);path.lineTo(p[2].x,p[2].y);path.closePath();
       const cx=(p[0].x+p[1].x+p[2].x)/3;
       const cy=(p[0].y+p[1].y+p[2].y)/3;
-      const rr=Math.max(Math.hypot(p[0].x-cx,p[0].y-cy),Math.hypot(p[1].x-cx,p[1].y-cy),Math.hypot(p[2].x-cx,p[2].y-cy))*1.1;
+      const rr=Math.max(Math.hypot(p[0].x-cx,p[0].y-cy),Math.hypot(p[1].x-cx,p[1].y-cy),Math.hypot(p[2].x-cx,p[2].y-cy))*1.2;
 
-      // 5a. AMBIENT GLASS TINT — very transparent in center, strongly tinted
-      //     at the silhouette (Fresnel). This makes glass look volumetric.
+      // dark navy solid base (opacity depends on which face is toward camera)
+      const faceAlpha=.55+f.lam*.3+f.fres*.15;
       x.save();
-      x.globalCompositeOperation='screen';
-      const glass=x.createRadialGradient(cx,cy,rr*.1,cx,cy,rr);
-      glass.addColorStop(0,`rgba(${metal.r},${metal.g},${metal.b},${.04+f.fres*.08})`);
-      glass.addColorStop(.65,hsl(hBase+f.i*26,56,42,.06+f.fres*.12));
-      glass.addColorStop(1,hsl(hBase+f.i*26+40,66,52,.18+f.fres*.30));
-      x.fillStyle=glass;
+      x.globalCompositeOperation='source-over';
+      // base fill: deep navy-blue, slightly lighter on lit faces
+      const darkBase=x.createLinearGradient(cx,cy-rr,cx,cy+rr);
+      const litL=Math.round(8+f.lam*18);
+      darkBase.addColorStop(0,`hsla(224,${62+f.lam*18}%,${litL+4}%,${faceAlpha})`);
+      darkBase.addColorStop(1,`hsla(236,58%,${litL}%,${faceAlpha})`);
+      x.fillStyle=darkBase;
       x.fill(path);
       x.restore();
 
-      // 5b. MAGNIFIED CHROMATIC TEXT — this is the core lens effect.
-      //     Text is redrawn at scale * 1.10 so it looks magnified by the glass.
-      //     Each RGB channel is offset along its own vector (true dispersion).
-      const dir=(f.i%2===0?1:-1);
-      const magScale=1.08+f.fres*.08;
-      const magSize=fsize*magScale;
+      // interior volumetric light — bright blue-white core radiating outward
       x.save();
       x.clip(path);
       x.globalCompositeOperation='screen';
-      x.font=`700 ${magSize}px "Inter","Helvetica Neue",Arial,sans-serif`;
-      x.textAlign='center';x.textBaseline='middle';
-      // Red shifts outward, blue shifts inward — true prism dispersion.
-      const disp=dispOff*(1+f.fres*.8);
-      x.fillStyle=`rgba(255,60,90,${.85+f.fres*.12})`;
-      x.fillText(txt,tcx+disp*dir+refracOff*.4*dir,tcy+disp*.2);
-      x.fillStyle=`rgba(255,180,70,.7)`;
-      x.fillText(txt,tcx+disp*.66*dir+refracOff*.3*dir,tcy+disp*.1);
-      x.fillStyle=`rgba(90,255,160,${.85+f.fres*.1})`;
-      x.fillText(txt,tcx+refracOff*.18*dir,tcy-disp*.15);
-      x.fillStyle=`rgba(70,200,255,.75)`;
-      x.fillText(txt,tcx-disp*.66*dir+refracOff*.3*dir,tcy-disp*.05);
-      x.fillStyle=`rgba(110,130,255,${.85+f.fres*.1})`;
-      x.fillText(txt,tcx-disp*dir+refracOff*.4*dir,tcy+disp*.15);
-      // Bright white core of the text reads through.
-      x.fillStyle=`rgba(255,255,255,${.5+(1-f.fres)*.35})`;
-      x.fillText(txt,tcx+refracOff*.25*dir,tcy);
+      // light source position follows the mouse-driven light vector
+      const lx=cx-lightVec[0]*rr*.55;
+      const ly=cy-lightVec[1]*rr*.55;
+      const volBeat=1+Math.sin(t*.9+f.fi)*.04;
+      const vol=x.createRadialGradient(lx,ly,0,lx,ly,rr*1.1*volBeat);
+      const baseAlpha=.55+f.lam*.55;
+      vol.addColorStop(0,`rgba(200,220,255,${baseAlpha})`);
+      vol.addColorStop(.18,`rgba(${metal.r},${metal.g},${metal.b},${baseAlpha*.82})`);
+      vol.addColorStop(.45,`rgba(60,100,255,${baseAlpha*.45})`);
+      vol.addColorStop(.75,`rgba(20,40,180,${baseAlpha*.18})`);
+      vol.addColorStop(1,'rgba(0,0,20,0)');
+      x.fillStyle=vol;
+      x.fillRect(cx-rr,cy-rr,rr*2,rr*2);
       x.restore();
 
-      // 5c. SPECULAR STREAK — a bright diagonal bar inside the face,
-      //     positioned from the light-direction projection.
-      if(f.lam>.1){
+      // bright white specular hotspot on lit faces
+      if(f.lam>.18){
         x.save();
         x.clip(path);
         x.globalCompositeOperation='screen';
-        const sx=cx-lightVec[0]*rr*.6;
-        const sy=cy-lightVec[1]*rr*.6;
-        const spec=x.createRadialGradient(sx,sy,0,sx,sy,rr*.9);
-        spec.addColorStop(0,`rgba(255,255,255,${.38*f.lam})`);
-        spec.addColorStop(.4,`rgba(${metal.r},${metal.g},${metal.b},${.18*f.lam})`);
-        spec.addColorStop(1,'rgba(255,255,255,0)');
+        const sx=cx-lightVec[0]*rr*.4;
+        const sy=cy-lightVec[1]*rr*.4;
+        const spec=x.createRadialGradient(sx,sy,0,sx,sy,rr*.6);
+        spec.addColorStop(0,`rgba(255,255,255,${.72*f.lam})`);
+        spec.addColorStop(.3,`rgba(180,210,255,${.38*f.lam})`);
+        spec.addColorStop(1,'rgba(0,0,0,0)');
         x.fillStyle=spec;
         x.fillRect(cx-rr,cy-rr,rr*2,rr*2);
         x.restore();
       }
-
-      // 5d. FINE SCANLINES inside face — subtle digital-glass grain.
-      if(!PERF.lite){
-        x.save();
-        x.clip(path);
-        x.globalCompositeOperation='overlay';
-        x.strokeStyle=`rgba(255,255,255,${.04+f.fres*.04})`;
-        x.lineWidth=1;
-        const step=4;
-        for(let y=Math.floor((cy-rr)/step)*step;y<cy+rr;y+=step){
-          x.beginPath();x.moveTo(cx-rr,y);x.lineTo(cx+rr,y);x.stroke();
-        }
-        x.restore();
-      }
     });
 
     // ================================================================
-    // LAYER 6: PRISMATIC EDGE RIBBONS — full-spectrum dispersion strip
-    //          perpendicular to each edge (real prism rainbow).
+    // LAYER 5: BRIGHT EDGES — glowing blue-white outlines
     // ================================================================
+    // soft glow pass behind edge
     x.save();
     x.globalCompositeOperation='screen';
     x.lineCap='round';
-    edges.forEach(([a,b])=>{
-      const ax=P[a].x,ay=P[a].y,bx=P[b].x,by=P[b].y;
-      // perpendicular unit vector, for stepping across the rainbow
-      const dx=bx-ax,dy=by-ay,L=Math.hypot(dx,dy)||1;
-      const px=-dy/L, py=dx/L;
-      const step=1.5, spread=dispOff*1.4;
-      spectrum.forEach((col,si)=>{
-        const t=(si/(spectrum.length-1))-.5;             // -0.5 → +0.5
-        const ox=px*t*spread, oy=py*t*spread;
-        x.strokeStyle=`rgba(${col[0]},${col[1]},${col[2]},.45)`;
-        x.lineWidth=step;
-        x.beginPath();x.moveTo(ax+ox,ay+oy);x.lineTo(bx+ox,by+oy);x.stroke();
-      });
-    });
+    x.lineWidth=6;
+    x.strokeStyle=`rgba(80,140,255,.28)`;
+    edges.forEach(([a,b])=>{x.beginPath();x.moveTo(P[a].x,P[a].y);x.lineTo(P[b].x,P[b].y);x.stroke()});
     x.restore();
-
-    // Polished bright white edge on top (thin) — crisp silhouette.
+    // thin bright white crisp edge on top
     x.save();
     x.lineCap='round';
-    x.strokeStyle=`rgba(255,255,255,${.75+(1-H.roughness)*.2})`;
-    x.lineWidth=Math.max(1,1.6-H.roughness*.6);
-    edges.forEach(([a,b])=>{
-      x.beginPath();x.moveTo(P[a].x,P[a].y);x.lineTo(P[b].x,P[b].y);x.stroke();
-    });
+    x.lineWidth=1.2;
+    x.strokeStyle='rgba(180,210,255,.92)';
+    edges.forEach(([a,b])=>{x.beginPath();x.moveTo(P[a].x,P[a].y);x.lineTo(P[b].x,P[b].y);x.stroke()});
     x.restore();
 
     // ================================================================
-    // LAYER 7: Vertex sparkle + 4-point stars — crystal corners catch light.
+    // LAYER 6: Vertex sparkle — corner flares in blue-white
     // ================================================================
     x.save();
     x.globalCompositeOperation='screen';
     P.forEach((v,i)=>{
-      if(v.z>u*.3)return;
-      const r=3+Math.sin(t*2+i*1.7)*1.3+(1-H.roughness)*2;
-      const g=x.createRadialGradient(v.x,v.y,0,v.x,v.y,r*3.5);
-      g.addColorStop(0,'rgba(255,255,255,1)');
-      g.addColorStop(.3,`rgba(${metal.r},${metal.g},${metal.b},.7)`);
-      g.addColorStop(1,'rgba(255,255,255,0)');
+      if(v.z>u*.35)return;
+      const r=2.5+Math.sin(t*2.2+i*1.7)*1.2;
+      // soft glow blob
+      const g=x.createRadialGradient(v.x,v.y,0,v.x,v.y,r*5);
+      g.addColorStop(0,'rgba(230,242,255,1)');
+      g.addColorStop(.2,'rgba(120,180,255,.8)');
+      g.addColorStop(.55,'rgba(60,100,255,.28)');
+      g.addColorStop(1,'rgba(0,0,0,0)');
       x.fillStyle=g;
-      x.beginPath();x.arc(v.x,v.y,r*3.5,0,Math.PI*2);x.fill();
-      x.strokeStyle='rgba(255,255,255,.95)';
-      x.lineWidth=1;
-      x.beginPath();x.moveTo(v.x-r*3.8,v.y);x.lineTo(v.x+r*3.8,v.y);x.moveTo(v.x,v.y-r*3.8);x.lineTo(v.x,v.y+r*3.8);x.stroke();
-      x.strokeStyle='rgba(255,255,255,.5)';
-      x.lineWidth=.6;
-      const d=r*2.4;
+      x.beginPath();x.arc(v.x,v.y,r*5,0,Math.PI*2);x.fill();
+      // 4-point star cross
+      x.strokeStyle='rgba(220,235,255,.95)';
+      x.lineWidth=.9;
+      const arm=r*4.2;
+      x.beginPath();x.moveTo(v.x-arm,v.y);x.lineTo(v.x+arm,v.y);x.moveTo(v.x,v.y-arm);x.lineTo(v.x,v.y+arm);x.stroke();
+      x.strokeStyle='rgba(180,210,255,.45)';
+      x.lineWidth=.5;
+      const d=arm*.65;
       x.beginPath();x.moveTo(v.x-d,v.y-d);x.lineTo(v.x+d,v.y+d);x.moveTo(v.x-d,v.y+d);x.lineTo(v.x+d,v.y-d);x.stroke();
     });
     x.restore();
