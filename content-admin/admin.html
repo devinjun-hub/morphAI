@@ -258,6 +258,10 @@ a{text-decoration:none;color:inherit}
   background:rgba(0,0,0,.68);
   color:#fff;
 }
+.thumb[draggable]{cursor:grab}
+.thumb[draggable]:active{cursor:grabbing}
+.thumb.dragging{opacity:.3;transform:scale(.96)}
+.thumb.drag-over{outline:2px solid rgba(255,255,255,.55);outline-offset:-2px}
 .preview-shell{
   position:sticky;
   top:22px;
@@ -462,7 +466,7 @@ function toast(msg){ alert(msg); }
 function refreshPreview(){
   const frame=$('#previewFrame');
   try{
-    frame.contentWindow.postMessage({type:'morphai_update',payload:normalize(DATA)},'*');
+    frame.contentWindow.postMessage({type:'morphai_reload'},'*');
   }catch(e){
     frame.src=`${PREVIEW_URL}?t=${Date.now()}`;
   }
@@ -526,21 +530,58 @@ function renderJobs(){
   });
 }
 
-function renderProjectThumbs(project, container){
+function updateThumbCount(container,project){
+  const h=container.closest('.card')&&container.closest('.card').querySelector('.helper');
+  if(h) h.textContent=`图片 ${String((project.images||[]).length).padStart(2,'0')} 张`;
+}
+
+function renderProjectThumbs(project,container){
   container.innerHTML='';
+  let dragSrc=null;
   (project.images||[]).forEach((src,index)=>{
     const item=document.createElement('div');
     item.className='thumb';
+    item.draggable=true;
     const label=(project.labels&&project.labels[index])||'';
     item.innerHTML=`
       <img class="thumb-media" src="${src}" alt="">
       <button class="thumb-remove" type="button">×</button>
-      <div class="thumb-meta"><input value="${escapeHtml(label)}" placeholder="图片标注"></div>
+      <div class="thumb-meta"><input value="${escapeHtml(label)}" placeholder="图片标注（可选）"></div>
     `;
+    item.addEventListener('dragstart',e=>{
+      dragSrc=index;
+      setTimeout(()=>item.classList.add('dragging'),0);
+      e.dataTransfer.effectAllowed='move';
+    });
+    item.addEventListener('dragend',()=>{
+      item.classList.remove('dragging');
+      container.querySelectorAll('.thumb').forEach(t=>t.classList.remove('drag-over'));
+    });
+    item.addEventListener('dragover',e=>{
+      e.preventDefault();
+      e.dataTransfer.dropEffect='move';
+      container.querySelectorAll('.thumb').forEach(t=>t.classList.remove('drag-over'));
+      item.classList.add('drag-over');
+    });
+    item.addEventListener('dragleave',()=>item.classList.remove('drag-over'));
+    item.addEventListener('drop',e=>{
+      e.preventDefault();
+      if(dragSrc===null||dragSrc===index) return;
+      const imgs=project.images, lbls=project.labels||[];
+      const [img]=imgs.splice(dragSrc,1);
+      const [lbl]=lbls.splice(dragSrc,1);
+      imgs.splice(index,0,img);
+      lbls.splice(index,0,lbl);
+      project.images=imgs; project.labels=lbls;
+      dragSrc=null;
+      renderProjectThumbs(project,container);
+      schedulePreview();
+    });
     item.querySelector('.thumb-remove').addEventListener('click',()=>{
       project.images.splice(index,1);
       project.labels.splice(index,1);
-      renderProjects();
+      renderProjectThumbs(project,container);
+      updateThumbCount(container,project);
       schedulePreview();
     });
     item.querySelector('input').addEventListener('input',e=>{
@@ -551,13 +592,13 @@ function renderProjectThumbs(project, container){
   });
 }
 
-function addFilesToProject(files, project){
+function addFilesToProject(files,project,container){
   Array.from(files||[]).forEach(file=>{
     const reader=new FileReader();
     reader.onload=e=>{
       project.images.push(e.target.result);
       project.labels.push(file.name.replace(/\.[^.]+$/,''));
-      renderProjects();
+      if(container){renderProjectThumbs(project,container);updateThumbCount(container,project);}
       schedulePreview();
     };
     reader.readAsDataURL(file);
@@ -616,7 +657,7 @@ function renderProjects(){
     card.querySelector('[data-act="up"]').addEventListener('click',()=>{ if(index>0){ [DATA.projects[index-1],DATA.projects[index]]=[DATA.projects[index],DATA.projects[index-1]]; renderProjects(); schedulePreview(); } });
     card.querySelector('[data-act="down"]').addEventListener('click',()=>{ if(index<DATA.projects.length-1){ [DATA.projects[index+1],DATA.projects[index]]=[DATA.projects[index],DATA.projects[index+1]]; renderProjects(); schedulePreview(); } });
     card.querySelector('[data-act="delete"]').addEventListener('click',()=>{ DATA.projects.splice(index,1); renderProjects(); schedulePreview(); });
-    card.querySelector(`#upload-${index}`).addEventListener('change',e=>addFilesToProject(e.target.files,project));
+    card.querySelector(`#upload-${index}`).addEventListener('change',e=>addFilesToProject(e.target.files,project,card.querySelector(`#thumbs-${index}`)));
 
     el.appendChild(card);
     renderProjectThumbs(project, card.querySelector(`#thumbs-${index}`));
