@@ -463,13 +463,14 @@ let autoPreview=true;
 let previewTimer=null;
 
 function toast(msg){ alert(msg); }
-function refreshPreview(){
+async function refreshPreview(){
   const frame=$('#previewFrame');
   try{
-    // 直接把当前 DATA 发过去（blob URL 是短字符串，体积很小）
-    // base64 大图跳过（iframe 会用自己 localStorage 里的版本）
-    const payload=JSON.parse(JSON.stringify(DATA,(k,v)=>{
-      if(typeof v==='string'&&v.startsWith('data:image')&&v.length>4096)return '__skip__';
+    // 先把 blob URL 转 base64（有缓存，重复调用很快）
+    // 已有的大 base64 跳过（iframe 用 localStorage 里的版本）
+    const resolved=await resolveBlobs(DATA);
+    const payload=JSON.parse(JSON.stringify(resolved,(k,v)=>{
+      if(typeof v==='string'&&v.startsWith('data:image')&&v.length>600000)return '__skip__';
       return v;
     }));
     frame.contentWindow.postMessage({type:'morphai_data',payload},'*');
@@ -480,11 +481,21 @@ function refreshPreview(){
 function schedulePreview(){
   if(!autoPreview) return;
   clearTimeout(previewTimer);
-  previewTimer=setTimeout(()=>{
+  previewTimer=setTimeout(async()=>{
     persistSettings();
     try{save(DATA);}catch(e){}
-    refreshPreview();
+    await refreshPreview();
   },260);
+}
+
+// blob URL → base64 缓存（同一个 blob 只转一次）
+const _blobCache=new Map();
+async function blobToB64(url){
+  if(_blobCache.has(url))return _blobCache.get(url);
+  const r=await fetch(url);const b=await r.blob();
+  const b64=await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=e=>res(e.target.result);fr.onerror=rej;fr.readAsDataURL(b)});
+  _blobCache.set(url,b64);
+  return b64;
 }
 
 // 将 blob: URL 转回 base64（保存/导出前调用）
@@ -493,10 +504,7 @@ async function resolveBlobs(data){
   for(const p of d.projects||[]){
     for(let i=0;i<(p.images||[]).length;i++){
       if(p.images[i]&&p.images[i].startsWith('blob:')){
-        try{
-          const r=await fetch(p.images[i]);const b=await r.blob();
-          p.images[i]=await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=e=>res(e.target.result);fr.onerror=rej;fr.readAsDataURL(b)});
-        }catch(e){p.images[i]='';}
+        try{p.images[i]=await blobToB64(p.images[i]);}catch(e){p.images[i]='';}
       }
     }
   }
