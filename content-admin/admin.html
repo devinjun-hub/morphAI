@@ -459,7 +459,14 @@ let autoPreview=true;
 let previewTimer=null;
 
 function toast(msg){ alert(msg); }
-function refreshPreview(){ $('#previewFrame').src=`${PREVIEW_URL}?preview=${Date.now()}`; }
+function refreshPreview(){
+  const frame=$('#previewFrame');
+  try{
+    frame.contentWindow.postMessage({type:'morphai_update',payload:normalize(DATA)},'*');
+  }catch(e){
+    frame.src=`${PREVIEW_URL}?t=${Date.now()}`;
+  }
+}
 function schedulePreview(){
   if(!autoPreview) return;
   clearTimeout(previewTimer);
