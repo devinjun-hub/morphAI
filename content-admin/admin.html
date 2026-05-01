@@ -316,6 +316,9 @@ a{text-decoration:none;color:inherit}
 }
 .saved-msg{position:fixed;bottom:20px;right:20px;z-index:999;background:#0fdf8f;color:#05070b;font:12px var(--mono);padding:8px 16px;border-radius:10px;opacity:0;transition:opacity .3s;letter-spacing:1px;pointer-events:none}
 .saved-msg.show{opacity:1}
+.fab{position:fixed;bottom:56px;right:20px;z-index:999;width:48px;height:48px;border-radius:50%;border:none;background:#f3f5f8;color:#0b0d11;font-size:20px;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,.5);transition:transform .2s,opacity .2s}
+.fab:hover{transform:scale(1.08)}
+.fab:active{transform:scale(.94)}
 </style>
 </head>
 <body>
@@ -394,6 +397,7 @@ a{text-decoration:none;color:inherit}
   <input id="jsonInput" type="file" accept="application/json" class="hidden">
 </div>
 <span class="saved-msg" id="savedMsg">已保存</span>
+<button class="fab hidden" id="fabSave">↓</button>
 
 <script>
 const STORAGE_KEY='lj_portfolio_v8';
@@ -740,6 +744,7 @@ $('#loginBtn').addEventListener('click',()=>{
     DATA=data;
     $('#loginView').classList.add('hidden');
     $('#adminView').classList.remove('hidden');
+    $('#fabSave').classList.remove('hidden');
     renderAll();
     refreshPreview();
   }else{
@@ -763,6 +768,7 @@ $('#saveBtn').addEventListener('click',async()=>{
 $('#exportBtn').addEventListener('click',exportJson);
 $('#importBtn').addEventListener('click',()=>$('#jsonInput').click());
 $('#refreshPreview').addEventListener('click',()=>{ persistSettings(); save(DATA); refreshPreview(); });
+$('#fabSave').addEventListener('click',()=>$('#saveBtn').click());
 $('#toggleAutoPreview').addEventListener('click',()=>{
   autoPreview=!autoPreview;
   $('#toggleAutoPreview').textContent=`自动预览：${autoPreview?'开':'关'}`;
