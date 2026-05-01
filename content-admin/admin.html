@@ -490,16 +490,8 @@ function compressImage(file,maxW=1920,q=0.80){
 
 function refreshPreview(){
   const frame=$('#previewFrame');
-  try{
-    // 压缩后的图片通常 <400KB，直接发；超大的旧图用 __skip__ 占位
-    const payload=JSON.parse(JSON.stringify(normalize(DATA),(k,v)=>{
-      if(typeof v==='string'&&v.startsWith('data:image')&&v.length>520000)return '__skip__';
-      return v;
-    }));
-    frame.contentWindow.postMessage({type:'morphai_data',payload},'*');
-  }catch(e){
-    frame.src=`${PREVIEW_URL}?t=${Date.now()}`;
-  }
+  // 手动刷新/保存时直接重载 iframe，确保始终显示最新内容
+  frame.src=`${PREVIEW_URL}?t=${Date.now()}`;
 }
 function schedulePreview(){
   clearTimeout(previewTimer);
