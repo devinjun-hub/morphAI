@@ -314,6 +314,8 @@ a{text-decoration:none;color:inherit}
   .topbar{flex-direction:column}
   .actions{justify-content:flex-start}
 }
+.saved-msg{position:fixed;bottom:20px;right:20px;z-index:999;background:#0fdf8f;color:#05070b;font:12px var(--mono);padding:8px 16px;border-radius:10px;opacity:0;transition:opacity .3s;letter-spacing:1px;pointer-events:none}
+.saved-msg.show{opacity:1}
 </style>
 </head>
 <body>
@@ -391,6 +393,7 @@ a{text-decoration:none;color:inherit}
 
   <input id="jsonInput" type="file" accept="application/json" class="hidden">
 </div>
+<span class="saved-msg" id="savedMsg">已保存</span>
 
 <script>
 const STORAGE_KEY='lj_portfolio_v8';
@@ -456,7 +459,7 @@ const load=()=>{
     return normalize(DEFAULT_DATA);
   }
 };
-const save=data=>{const d=normalize(data);d.__ver=(d.__ver||0)+1;localStorage.setItem(STORAGE_KEY,JSON.stringify(d));};
+const save=data=>{const d=normalize(data);d.__ver=(d.__ver||0)+1;localStorage.setItem(STORAGE_KEY,JSON.stringify(d));const m=$('#savedMsg');m.classList.add('show');clearTimeout(m._t);m._t=setTimeout(()=>m.classList.remove('show'),1200);};
 
 let DATA=load();
 let autoPreview=true;
@@ -495,12 +498,11 @@ function refreshPreview(){
   }
 }
 function schedulePreview(){
-  if(!autoPreview) return;
   clearTimeout(previewTimer);
   previewTimer=setTimeout(()=>{
     persistSettings();
     try{save(DATA);}catch(e){}
-    refreshPreview();
+    if(autoPreview) refreshPreview();
   },260);
 }
 
