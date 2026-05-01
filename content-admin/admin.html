@@ -396,7 +396,7 @@ a{text-decoration:none;color:inherit}
 const STORAGE_KEY='lj_portfolio_v8';
 const PREVIEW_URL='../index.html';
 const DEFAULT_DATA={
-  pw:'liu2025',
+  pw:'liujun2025',
   email:'ljyyshxq@163.com',
   ht:'MORPH',
   startYear:2016,
@@ -456,7 +456,7 @@ const load=()=>{
     return normalize(DEFAULT_DATA);
   }
 };
-const save=data=>localStorage.setItem(STORAGE_KEY,JSON.stringify(normalize(data)));
+const save=data=>{const d=normalize(data);d.__ver=(d.__ver||0)+1;localStorage.setItem(STORAGE_KEY,JSON.stringify(d));};
 
 let DATA=load();
 let autoPreview=true;
