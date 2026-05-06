@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MORPHAI Content Admin</title>
+<script src="../lib/pdf.min.js"></script>
+<script>pdfjsLib.GlobalWorkerOptions.workerSrc='../lib/pdf.worker.min.js';</script>
 <style>
 :root{
   --bg:#090b10;
@@ -76,11 +78,16 @@ a{text-decoration:none;color:inherit}
   min-width:0;
 }
 .topbar{
+  position:sticky;
+  top:0;
+  z-index:100;
   display:flex;
   justify-content:space-between;
   align-items:flex-start;
   gap:16px;
+  padding:16px 0 12px;
   margin-bottom:18px;
+  background:radial-gradient(circle at 20% 0%,rgba(152,172,255,.08),transparent 26%),linear-gradient(180deg,#090b10,#0c1016);
 }
 .title{
   font-size:clamp(34px,4vw,66px);
@@ -316,9 +323,11 @@ a{text-decoration:none;color:inherit}
 }
 .saved-msg{position:fixed;bottom:20px;right:20px;z-index:999;background:#0fdf8f;color:#05070b;font:12px var(--mono);padding:8px 16px;border-radius:10px;opacity:0;transition:opacity .3s;letter-spacing:1px;pointer-events:none}
 .saved-msg.show{opacity:1}
-.fab{position:fixed;bottom:56px;right:20px;z-index:999;width:48px;height:48px;border-radius:50%;border:none;background:#f3f5f8;color:#0b0d11;font-size:20px;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,.5);transition:transform .2s,opacity .2s}
+.fab{position:fixed;bottom:32px;right:20px;z-index:999;border:none;background:#f3f5f8;color:#0b0d11;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,.5);transition:transform .2s,opacity .2s;padding:14px 20px;border-radius:999px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;letter-spacing:1px}
 .fab:hover{transform:scale(1.08)}
 .fab:active{transform:scale(.94)}
+#pdfOverlay{position:fixed;inset:0;z-index:9999;background:rgba(3,3,5,.94);display:none;flex-direction:column;padding:32px;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}#pdfOverlay.show{display:flex}#pdfOverlay .pdf-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-shrink:0}#pdfOverlay .pdf-head h2{font-size:28px;font-weight:800;letter-spacing:-.03em}#pdfOverlay .pdf-head p{color:rgba(255,255,255,.5);font-size:13px;margin-top:6px}#pdfOverlay .pdf-actions{display:flex;gap:12px}#pdfOverlay .pdf-btn{padding:9px 20px;border-radius:999px;font:11px var(--mono);letter-spacing:1.5px;cursor:pointer;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.06);color:#fff;transition:.2s}#pdfOverlay .pdf-btn:hover{background:rgba(255,255,255,.12)}#pdfOverlay .pdf-btn.primary{background:#fff;color:#05070b;font-weight:700}#pdfOverlay .pdf-btn.primary:disabled{opacity:.4;cursor:not-allowed}#pdfOverlay .pdf-btn.primary:not(:disabled):hover{background:rgba(255,255,255,.88)}#pdfPageGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px;overflow-y:auto;flex:1;padding:4px}#pdfPageGrid .pdf-page{cursor:pointer;border-radius:8px;overflow:hidden;border:2px solid rgba(255,255,255,.3);transition:opacity .2s,border-color .2s;position:relative}#pdfPageGrid .pdf-page:hover{border-color:#98acff}#pdfPageGrid .pdf-page img{width:100%;height:auto;display:block;object-fit:contain}#pdfPageGrid .pdf-page .page-num{position:absolute;top:8px;left:8px;background:rgba(0,0,0,.7);color:#fff;padding:3px 8px;border-radius:6px;font:10px monospace}#pdfPageGrid .pdf-page .page-check{position:absolute;top:8px;right:8px;width:24px;height:24px;border-radius:50%;background:#0fdf8f;color:#05070b;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px}#pdfPageGrid .pdf-page.deselected{border-color:rgba(100,60,60,.5);opacity:.45}#pdfPageGrid .pdf-page.deselected .page-check{display:none}
+#pdfPageGrid .pdf-page .crop-btn{opacity:0;transition:opacity .2s}#pdfPageGrid .pdf-page:hover .crop-btn{opacity:1}
 </style>
 </head>
 <body>
@@ -397,7 +406,7 @@ a{text-decoration:none;color:inherit}
   <input id="jsonInput" type="file" accept="application/json" class="hidden">
 </div>
 <span class="saved-msg" id="savedMsg">已保存</span>
-<button class="fab hidden" id="fabSave">↓</button>
+<button class="fab hidden" id="fabSave">↓ 保存全部</button>
 
 <script>
 const STORAGE_KEY='lj_portfolio_v8';
@@ -453,19 +462,13 @@ const normalize=d=>{
   }));
   return next;
 };
-const load=()=>{
-  try{
-    const raw=localStorage.getItem(STORAGE_KEY);
-    if(!raw) return normalize(DEFAULT_DATA);
-    const parsed=JSON.parse(raw);
-    return isLegacyTemplate(parsed)?normalize(DEFAULT_DATA):normalize(parsed);
-  }catch{
-    return normalize(DEFAULT_DATA);
-  }
-};
-const save=data=>{const d=normalize(data);d.__ver=(d.__ver||0)+1;localStorage.setItem(STORAGE_KEY,JSON.stringify(d));const m=$('#savedMsg');m.classList.add('show');clearTimeout(m._t);m._t=setTimeout(()=>m.classList.remove('show'),1200);};
+const loadFromAPI=async()=>{try{const r=await fetch('/api/data');if(!r.ok)throw 1;const d=await r.json();return normalize(d)}catch{return null}};
+const saveToAPI=async(data)=>{try{const r=await fetch('/api/data',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pw:data.pw||'liujun2025',data})});const j=await r.json();return j.ok}catch{return false}};
+const cacheLocally=data=>{try{localStorage.setItem(STORAGE_KEY,JSON.stringify(normalize(data)))}catch(e){}};
+const showSaved=()=>{const m=$('#savedMsg');m.classList.add('show');clearTimeout(m._t);m._t=setTimeout(()=>m.classList.remove('show'),1200);try{new BroadcastChannel('morphai_sync').postMessage('updated')}catch(e){}};
+const loadFromLocal=()=>{try{const raw=localStorage.getItem(STORAGE_KEY);if(!raw)return normalize(DEFAULT_DATA);const parsed=JSON.parse(raw);return isLegacyTemplate(parsed)?normalize(DEFAULT_DATA):normalize(parsed)}catch{return normalize(DEFAULT_DATA)}};
 
-let DATA=load();
+let DATA=normalize(DEFAULT_DATA);
 let autoPreview=true;
 let previewTimer=null;
 
@@ -488,17 +491,221 @@ function compressImage(file,maxW=1920,q=0.80){
   });
 }
 
+// --- PDF Upload ---
+let pdfTargetProject=null,pdfTargetContainer=null;
+async function renderPageToCanvas(pdfDoc,pageNum,scale){
+  const page=await pdfDoc.getPage(pageNum);
+  const vp=page.getViewport({scale});
+  const cv=document.createElement('canvas');
+  cv.width=vp.width; cv.height=vp.height;
+  const ctx=cv.getContext('2d');
+  await page.render({canvasContext:ctx,viewport:vp}).promise;
+  return cv;
+}
+function autoCropCanvas(cv,t){t=t||200;const ctx=cv.getContext('2d'),W=cv.width,H=cv.height,d=ctx.getImageData(0,0,W,H).data;let T=0,B=H-1,L=0,R=W-1;const skipH=Math.round(H*.04),skipW=Math.round(W*.04);a:for(let y=skipH;y<H;y++){let c=0;for(let x=skipW;x<W-skipW;x++){const i=(y*W+x)*4;if(d[i]<t||d[i+1]<t||d[i+2]<t)c++}if(c>W*.02){T=y;break a}}b:for(let y=H-1-skipH;y>=0;y--){let c=0;for(let x=skipW;x<W-skipW;x++){const i=(y*W+x)*4;if(d[i]<t||d[i+1]<t||d[i+2]<t)c++}if(c>W*.02){B=y;break b}}c:for(let x=skipW;x<W;x++){let c=0;for(let y=skipH;y<H-skipH;y++){const i=(y*W+x)*4;if(d[i]<t||d[i+1]<t||d[i+2]<t)c++}if(c>H*.02){L=x;break c}}d:for(let x=W-1-skipW;x>=0;x--){let c=0;for(let y=skipH;y<H-skipH;y++){const i=(y*W+x)*4;if(d[i]<t||d[i+1]<t||d[i+2]<t)c++}if(c>H*.02){R=x;break d}}const pX=Math.round(W*.015),pY=Math.round(H*.015);L=Math.max(0,L-pX);T=Math.max(0,T-pY);R=Math.min(W-1,R+pX);B=Math.min(H-1,B+pY);const cW=R-L+1,cH=B-T+1;if(cW<=0||cH<=0||cW>=W*.95)return cv;const cc=document.createElement('canvas');cc.width=cW;cc.height=cH;cc.getContext('2d').drawImage(cv,L,T,cW,cH,0,0,cW,cH);return cc}
+function handlePDFUpload(files,project,container){
+  const file=files&&files[0];
+  if(!file||(file.type!=='application/pdf'&&!file.name.match(/\.pdf$/i))){toast('请选择 PDF 文件');return}
+  pdfTargetProject=project; pdfTargetContainer=container;
+  const reader=new FileReader();
+  reader.onload=async e=>{
+    const data=new Uint8Array(e.target.result);
+    if(typeof pdfjsLib==='undefined'){toast('PDF 库未加载，请检查网络');return}
+    let pdf;try{pdf=await pdfjsLib.getDocument({data}).promise}catch(er){toast('PDF 解析失败');return}
+    const total=pdf.numPages;
+    const grid=document.getElementById('pdfPageGrid');
+    grid.innerHTML='';
+    const sel=new Array(total).fill(true);
+    const crop_data=new Array(total).fill(null);
+    let cropPageIdx=-1;
+    let cropFullCvs=null;
+    for(let i=1;i<=total;i++){
+      const idx=i-1;
+      const cv=await renderPageToCanvas(pdf,i,0.4);
+      const wrap=document.createElement('div');
+      wrap.className='pdf-page';
+      wrap.innerHTML=`<img src="${cv.toDataURL('image/jpeg',.6)}" alt="Page ${i}"><span class="page-num">${i}</span><span class="page-check">✓</span><button class="crop-btn">裁切</button>`;
+      wrap.addEventListener('click',()=>{
+        sel[idx]=!sel[idx];
+        wrap.classList.toggle('deselected',!sel[idx]);
+        document.getElementById('pdfConfirm').textContent=`确认导入选中页面（${sel.filter(Boolean).length}/${total}）`;
+      });
+      wrap.querySelector('.crop-btn').addEventListener('click',async e=>{
+        e.stopPropagation();
+        cropPageIdx=idx;
+        cropFullCvs=await renderPageToCanvas(pdf,i,1.0);
+        const img=document.getElementById('cropImg');
+        img.src=cropFullCvs.toDataURL();
+        const selEl=document.getElementById('cropSel');
+        selEl.style.display='none';
+        cropNaturalW=cropFullCvs.width;
+        cropNaturalH=cropFullCvs.height;
+        if(crop_data[idx]){
+          const cd=crop_data[idx];
+          const cw=img.clientWidth;
+          selEl.style.display='block';
+          selEl.style.left=(cd.x*cw)+'px';selEl.style.top=(cd.y*img.clientHeight)+'px';
+          selEl.style.width=(cd.w*cw)+'px';selEl.style.height=(cd.h*img.clientHeight)+'px';
+          cropRect={x:cd.x*cw,y:cd.y*img.clientHeight,w:cd.w*cw,h:cd.h*img.clientHeight};
+        }
+        document.getElementById('cropModal').style.display='flex';
+      });
+      grid.appendChild(wrap);
+    }
+    document.getElementById('pdfSelectAll').onclick=()=>{grid.querySelectorAll('.pdf-page').forEach((w,i)=>{sel[i]=true;w.classList.remove('deselected')});document.getElementById('pdfConfirm').textContent='确认导入选中页面（'+total+'/'+total+'）'};
+    document.getElementById('pdfDeselectAll').onclick=()=>{grid.querySelectorAll('.pdf-page').forEach((w,i)=>{sel[i]=false;w.classList.add('deselected')});document.getElementById('pdfConfirm').textContent='确认导入选中页面（0/'+total+'）'};
+    document.getElementById('pdfConfirm').onclick=async()=>{
+      const n=sel.filter(Boolean).length;
+      if(!n){alert('请至少选择一页');return}
+      document.getElementById('pdfConfirm').textContent='正在处理...';
+      document.getElementById('pdfConfirm').disabled=true;
+      for(let i=0;i<sel.length;i++){
+        if(!sel[i])continue;
+        try{
+          const cv=await renderPageToCanvas(pdf,i+1,1.5);
+          let cropped;
+          const cd=crop_data[i];
+          if(cd&&cd.w>0.01&&cd.h>0.01){
+            const x=Math.round(cd.x*cv.width),y=Math.round(cd.y*cv.height);
+            const w=Math.round(cd.w*cv.width),h=Math.round(cd.h*cv.height);
+            const cc=document.createElement('canvas');
+            cc.width=w;cc.height=h;
+            cc.getContext('2d').drawImage(cv,x,y,w,h,0,0,w,h);
+            cropped=cc;
+          }else{
+            cropped=autoCropCanvas(cv);
+          }
+          const b64=cropped.toDataURL('image/jpeg',.80);
+          pdfTargetProject.images.push(b64);
+          pdfTargetProject.labels.push('PDF 第 '+(i+1)+' 页');
+        }catch(e){console.error('PDF page conversion failed:',e)}
+      }
+      if(pdfTargetContainer){
+        renderProjectThumbs(pdfTargetProject,pdfTargetContainer);
+        updateThumbCount(pdfTargetContainer,pdfTargetProject);
+      }
+      document.getElementById('pdfOverlay').classList.remove('show');
+      document.getElementById('pdfPageGrid').innerHTML='';
+      document.getElementById('pdfConfirm').disabled=false;
+      pdfTargetProject=null; pdfTargetContainer=null;
+      schedulePreview();
+      toast('已导入 '+n+' 页');
+    };
+    document.getElementById('pdfCancel').onclick=()=>{
+      document.getElementById('pdfOverlay').classList.remove('show');
+      document.getElementById('pdfPageGrid').innerHTML='';
+      document.getElementById('pdfConfirm').disabled=false;
+      pdfTargetProject=null; pdfTargetContainer=null;
+    };
+    // Wire crop modal for this upload session
+    const wCropConfirm=$('#cropConfirm'),wCropCancel=$('#cropCancel'),wCropReset=$('#cropReset');
+    wCropConfirm.onclick=()=>{
+      const r=cropRect;
+      if(r.w<20||r.h<20){alert('请框选要保留的区域');return}
+      const img=document.getElementById('cropImg');
+      const scX=cropNaturalW/img.clientWidth,scY=cropNaturalH/img.clientHeight;
+      crop_data[cropPageIdx]={x:r.x*scX/cropNaturalW,y:r.y*scY/cropNaturalH,w:r.w*scX/cropNaturalW,h:r.h*scY/cropNaturalH};
+      document.getElementById('cropModal').style.display='none';
+      cropRect={x:0,y:0,w:0,h:0};
+    };
+    wCropCancel.onclick=()=>{
+      document.getElementById('cropModal').style.display='none';
+      cropRect={x:0,y:0,w:0,h:0};
+    };
+    wCropReset.onclick=()=>{
+      document.getElementById('cropSel').style.display='none';
+      cropRect={x:0,y:0,w:0,h:0};
+      crop_data[cropPageIdx]=null;
+    };
+    document.getElementById('pdfOverlay').classList.add('show');
+    document.getElementById('pdfConfirm').textContent='确认导入选中页面（'+total+'/'+total+'）';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// --- Manual crop interaction ---
+let cropDragging=false,cropStart={x:0,y:0},cropRect={x:0,y:0,w:0,h:0};
+let cropNaturalW=0,cropNaturalH=0;
+let cropEventsInited=false;
+function ensureCropEvents(){
+  if(cropEventsInited)return;cropEventsInited=true;
+  const cv=document.getElementById('cropCanvas');
+  if(!cv){setTimeout(ensureCropEvents,100);return}
+  cv.addEventListener('mousedown',e=>{
+    const r=e.target.getBoundingClientRect();
+    cropDragging=true;cropStart.x=e.clientX-r.left;cropStart.y=e.clientY-r.top;
+  });
+  window.addEventListener('mousemove',e=>{
+    if(!cropDragging)return;
+    const r=cv.getBoundingClientRect();
+    const mx=Math.max(0,Math.min(e.clientX-r.left,r.width));
+    const my=Math.max(0,Math.min(e.clientY-r.top,r.height));
+    const x=Math.min(cropStart.x,mx),y=Math.min(cropStart.y,my);
+    const w=Math.abs(mx-cropStart.x),h=Math.abs(my-cropStart.y);
+    cropRect={x,y,w,h};
+    const sel=document.getElementById('cropSel');
+    sel.style.display='block';
+    sel.style.left=x+'px';sel.style.top=y+'px';
+    sel.style.width=w+'px';sel.style.height=h+'px';
+  });
+  window.addEventListener('mouseup',()=>{cropDragging=false});
+  // touch support
+  cv.addEventListener('touchstart',e=>{
+    const t=e.touches[0];const r=e.target.getBoundingClientRect();
+    cropDragging=true;cropStart.x=t.clientX-r.left;cropStart.y=t.clientY-r.top;
+    e.preventDefault();
+  },{passive:false});
+  cv.addEventListener('touchmove',e=>{
+    if(!cropDragging)return;e.preventDefault();
+    const t=e.touches[0];const r=cv.getBoundingClientRect();
+    const mx=Math.max(0,Math.min(t.clientX-r.left,r.width));
+    const my=Math.max(0,Math.min(t.clientY-r.top,r.height));
+    const x=Math.min(cropStart.x,mx),y=Math.min(cropStart.y,my);
+    const w=Math.abs(mx-cropStart.x),h=Math.abs(my-cropStart.y);
+    cropRect={x,y,w,h};
+    const sel=document.getElementById('cropSel');
+    sel.style.display='block';
+    sel.style.left=x+'px';sel.style.top=y+'px';
+    sel.style.width=w+'px';sel.style.height=h+'px';
+  },{passive:false});
+  cv.addEventListener('touchend',()=>{cropDragging=false});
+}
+if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',ensureCropEvents)}else{ensureCropEvents()}
+
+function syncPreviewToIframe(){
+  const frame=$('#previewFrame');
+  if(frame&&frame.contentWindow){
+    frame.contentWindow.postMessage({type:'morphai_data',payload:normalize(DATA)},'*');
+  }
+}
 function refreshPreview(){
   const frame=$('#previewFrame');
-  // 手动刷新/保存时直接重载 iframe，确保始终显示最新内容
   frame.src=`${PREVIEW_URL}?t=${Date.now()}`;
+  frame.onload=()=>{syncPreviewToIframe();frame.onload=null};
 }
-function schedulePreview(){
+async function uploadBase64Images(data){
+  for(const p of data.projects||[]){
+    for(let i=0;i<(p.images||[]).length;i++){
+      if(p.images[i]&&p.images[i].startsWith('data:')){
+        try{
+          const r=await fetch('/api/upload-image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:p.images[i]})});
+          const j=await r.json();
+          if(j.ok)p.images[i]=j.path;
+        }catch(e){console.warn('upload failed, kept inline',e)}
+      }
+    }
+  }
+}
+async function schedulePreview(){
   clearTimeout(previewTimer);
-  previewTimer=setTimeout(()=>{
+  previewTimer=setTimeout(async()=>{
     persistSettings();
-    try{save(DATA);}catch(e){}
-    if(autoPreview) refreshPreview();
+    const d=JSON.parse(JSON.stringify(DATA));
+    await uploadBase64Images(d);
+    d.projects.forEach((p,i)=>{if(DATA.projects[i])DATA.projects[i].images=p.images});
+    cacheLocally(d);
+    try{await saveToAPI(d)}catch(e){}
+    if(autoPreview) syncPreviewToIframe();
   },260);
 }
 
@@ -672,6 +879,8 @@ function renderProjects(){
             <div class="upload-top">
               <label class="btn" for="upload-${index}">选择本地图片</label>
               <input class="upload-input" id="upload-${index}" type="file" accept="image/*" multiple>
+              <label class="btn" for="pdf-upload-${index}" style="background:rgba(152,172,255,.15);border-color:rgba(152,172,255,.3)">上传 PDF</label>
+              <input class="upload-input" id="pdf-upload-${index}" type="file" accept=".pdf,application/pdf">
               <div class="helper">上传后会直接显示缩略图，并参与右侧主站排版预览。</div>
             </div>
             <div class="thumbs" id="thumbs-${index}"></div>
@@ -694,6 +903,8 @@ function renderProjects(){
     card.querySelector('[data-act="down"]').addEventListener('click',()=>{ if(index<DATA.projects.length-1){ [DATA.projects[index+1],DATA.projects[index]]=[DATA.projects[index],DATA.projects[index+1]]; renderProjects(); schedulePreview(); } });
     card.querySelector('[data-act="delete"]').addEventListener('click',()=>{ DATA.projects.splice(index,1); renderProjects(); schedulePreview(); });
     card.querySelector(`#upload-${index}`).addEventListener('change',e=>addFilesToProject(e.target.files,project,card.querySelector(`#thumbs-${index}`)));
+    const pdfInput=card.querySelector(`#pdf-upload-${index}`);
+    if(pdfInput)pdfInput.addEventListener('change',e=>{handlePDFUpload(e.target.files,project,card.querySelector(`#thumbs-${index}`));e.target.value=''});
 
     el.appendChild(card);
     renderProjectThumbs(project, card.querySelector(`#thumbs-${index}`));
@@ -730,18 +941,17 @@ async function exportJson(){
   setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },100);
 }
 
-$('#loginBtn').addEventListener('click',()=>{
-  const data=load();
-  if($('#password').value===data.pw){
-    DATA=data;
-    $('#loginView').classList.add('hidden');
-    $('#adminView').classList.remove('hidden');
-    $('#fabSave').classList.remove('hidden');
-    renderAll();
-    refreshPreview();
-  }else{
-    toast('密码错误');
-  }
+$('#loginBtn').addEventListener('click',async()=>{
+  const local=loadFromLocal();
+  if($('#password').value!==local.pw){toast('密码错误');return}
+  const remote=await loadFromAPI();
+  DATA=remote||local;
+  cacheLocally(DATA);
+  $('#loginView').classList.add('hidden');
+  $('#adminView').classList.remove('hidden');
+  $('#fabSave').classList.remove('hidden');
+  renderAll();
+  refreshPreview();
 });
 
 $('#password').addEventListener('keydown',e=>{ if(e.key==='Enter') $('#loginBtn').click(); });
@@ -751,36 +961,43 @@ $('#addProjectBtn').addEventListener('click',()=>{ DATA.projects.push({id:Date.n
 $('#saveBtn').addEventListener('click',async()=>{
   persistSettings();
   const d=await resolveBlobs(DATA);
-  // 把转好的 base64 写回 DATA，让后续操作也能用
   d.projects.forEach((p,i)=>{if(DATA.projects[i])DATA.projects[i].images=p.images;});
-  save(d);
-  refreshPreview();
-  toast('已保存并刷新预览');
+  await uploadBase64Images(d);
+  d.projects.forEach((p,i)=>{if(DATA.projects[i])DATA.projects[i].images=p.images});
+  cacheLocally(d);
+  const ok=await saveToAPI(d);
+  if(ok){showSaved();}else toast('已保存（本地缓存，服务器未连接）');
+  syncPreviewToIframe();
 });
 $('#exportBtn').addEventListener('click',exportJson);
 $('#importBtn').addEventListener('click',()=>$('#jsonInput').click());
-$('#refreshPreview').addEventListener('click',()=>{ persistSettings(); save(DATA); refreshPreview(); });
+$('#refreshPreview').addEventListener('click',async()=>{ persistSettings(); const d=JSON.parse(JSON.stringify(DATA)); await uploadBase64Images(d); d.projects.forEach((p,i)=>{if(DATA.projects[i])DATA.projects[i].images=p.images}); cacheLocally(d); try{await saveToAPI(d)}catch(e){} refreshPreview(); });
 $('#fabSave').addEventListener('click',()=>$('#saveBtn').click());
-$('#toggleAutoPreview').addEventListener('click',()=>{
+$('#toggleAutoPreview').addEventListener('click',async()=>{
   autoPreview=!autoPreview;
   $('#toggleAutoPreview').textContent=`自动预览：${autoPreview?'开':'关'}`;
   if(autoPreview){
     persistSettings();
-    save(DATA);
-    refreshPreview();
+    const d=JSON.parse(JSON.stringify(DATA));
+    await uploadBase64Images(d);
+    d.projects.forEach((p,i)=>{if(DATA.projects[i])DATA.projects[i].images=p.images});
+    cacheLocally(d);
+    try{await saveToAPI(d)}catch(e){}
+    syncPreviewToIframe();
   }
 });
 $('#jsonInput').addEventListener('change',e=>{
   const file=e.target.files&&e.target.files[0];
   if(!file) return;
   const reader=new FileReader();
-  reader.onload=ev=>{
+  reader.onload=async()=>{
     try{
-      DATA=normalize(JSON.parse(ev.target.result));
-      save(DATA);
+      DATA=normalize(JSON.parse(reader.result));
+      cacheLocally(DATA);
+      const ok=await saveToAPI(DATA);
       renderAll();
-      refreshPreview();
-      toast('JSON 导入成功');
+      syncPreviewToIframe();
+      toast(ok?'JSON 导入成功':'已导入（本地缓存，服务器未连接）');
     }catch{
       toast('JSON 文件格式不正确');
     }
@@ -788,13 +1005,14 @@ $('#jsonInput').addEventListener('change',e=>{
   reader.readAsText(file,'utf-8');
   e.target.value='';
 });
-$('#resetBtn').addEventListener('click',()=>{
+$('#resetBtn').addEventListener('click',async()=>{
   if(confirm('确定重置为默认模板吗？')){
     DATA=normalize(DEFAULT_DATA);
-    save(DATA);
+    cacheLocally(DATA);
+    const ok=await saveToAPI(DATA);
     renderAll();
-    refreshPreview();
-    toast('已重置');
+    syncPreviewToIframe();
+    toast(ok?'已重置':'已重置（本地缓存，服务器未连接）');
   }
 });
 
@@ -803,5 +1021,33 @@ $('#resetBtn').addEventListener('click',()=>{
   if(el) el.addEventListener('input',schedulePreview);
 });
 </script>
+<div id="pdfOverlay">
+  <div class="pdf-head">
+    <div>
+      <h2>选择需要导入的页面</h2>
+      <p>勾选要保留的页面，确认后自动压缩添加到项目图片中</p>
+    </div>
+    <div class="pdf-actions">
+      <button id="pdfSelectAll" class="pdf-btn">全选</button>
+      <button id="pdfDeselectAll" class="pdf-btn">取消全选</button>
+      <button id="pdfConfirm" class="pdf-btn primary">确认导入选中页面</button>
+      <button id="pdfCancel" class="pdf-btn">取消</button>
+    </div>
+  </div>
+  <div id="pdfPageGrid"></div>
+  <div id="cropModal" style="display:none;position:absolute;inset:0;z-index:10;background:rgba(0,0,0,.94);flex-direction:column;align-items:center;justify-content:center;padding:20px">
+    <div style="position:relative;max-width:94vw;max-height:76vh;overflow:hidden" id="cropWrap">
+      <img id="cropImg" style="max-width:94vw;max-height:70vh;display:block">
+      <canvas id="cropCanvas" style="position:absolute;inset:0;width:100%;height:100%;cursor:crosshair"></canvas>
+      <div id="cropSel" style="display:none;position:absolute;border:2px solid #0fdf8f;background:rgba(15,223,143,.08);pointer-events:none;box-shadow:0 0 0 9999px rgba(0,0,0,.62)"></div>
+    </div>
+    <div style="display:flex;gap:12px;margin-top:16px;align-items:center">
+      <span style="font:11px var(--mono);color:rgba(255,255,255,.5)">在图片上拖拽框选要保留的区域</span>
+      <button class="pdf-btn" id="cropReset">重置</button>
+      <button class="pdf-btn primary" id="cropConfirm">确认裁剪</button>
+      <button class="pdf-btn" id="cropCancel">取消</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>

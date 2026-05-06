@@ -1,0 +1,38 @@
+{
+  "pw": "liu2025",
+  "email": "ljyyshxq@163.com",
+  "ht": "MORPH",
+  "ab": "在这里填写你的 About 简介。",
+  "svcs": "创意主导 | Creative Direction\nAI驱动设计流程 | AI-Augmented Workflow\n跨部门协同推进 | Cross-Functional Delivery",
+  "ig": "",
+  "be": "",
+  "li": "",
+  "jobs": [
+    {
+      "id": 1,
+      "company": "上海瑞马展览有限公司",
+      "role": "展览展示空间设计师",
+      "year": "2023.09-至今",
+      "desc": "在这里填写这段工作经历。"
+    }
+  ],
+  "projects": [
+    {
+      "id": 1,
+      "name": "项目名称",
+      "sub": "Project Subtitle",
+      "cat": "Design · Category",
+      "type": "项目类型",
+      "loc": "城市",
+      "year": "2026",
+      "scale": "你的角色",
+      "desc": "在这里填写项目介绍。",
+      "images": [
+        "images/example/project-01.jpg"
+      ],
+      "labels": [
+        "主视角"
+      ]
+    }
+  ]
+}

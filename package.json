@@ -1,0 +1,13 @@
+{
+  "name": "morphai-portfolio",
+  "version": "1.0.0",
+  "description": "MORPHAI Exhibition Designer Portfolio",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
