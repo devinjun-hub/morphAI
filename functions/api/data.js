@@ -158,9 +158,16 @@ export async function onRequest(context) {
   const { request, env } = context;
 
   if (request.method === 'GET') {
-    const d = JSON.parse(JSON.stringify(DATA));
-    proxyImages(d);
-    return new Response(JSON.stringify(d), {
+    let data = null;
+    if (env.MORPHAI_KV) {
+      try {
+        const raw = await env.MORPHAI_KV.get('site_data');
+        if (raw) data = JSON.parse(raw);
+      } catch (_) {}
+    }
+    if (!data) data = JSON.parse(JSON.stringify(DATA));
+    proxyImages(data);
+    return new Response(JSON.stringify(data), {
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
     });
   }
@@ -173,14 +180,44 @@ export async function onRequest(context) {
           status: 400, headers: { 'Content-Type': 'application/json' }
         });
       }
-      const { pw } = body || {};
-      if (!pw || pw !== DATA.pw) {
+      const { pw, data } = body || {};
+      if (!pw) {
         return new Response(JSON.stringify({ ok: false, error: '密码错误' }), {
           status: 403, headers: { 'Content-Type': 'application/json' }
         });
       }
+
+      // Check password
+      let stored = null;
+      if (env.MORPHAI_KV) {
+        try {
+          const raw = await env.MORPHAI_KV.get('site_data');
+          if (raw) stored = JSON.parse(raw);
+        } catch (_) {}
+      }
+      if (!stored) stored = DATA;
+      if (pw !== stored.pw) {
+        return new Response(JSON.stringify({ ok: false, error: '密码错误' }), {
+          status: 403, headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      // Save to KV if available
+      if (env.MORPHAI_KV && data) {
+        data.__ver = (stored.__ver || 0) + 1;
+        data.pw = stored.pw;
+        await env.MORPHAI_KV.put('site_data', JSON.stringify(data)).catch(_ => {});
+      }
+
       return new Response(JSON.stringify({ ok: true }), {
         headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+      });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), {
+        status: 500, headers: { 'Content-Type': 'application/json' }
+      });
+    }
+  }
       });
     } catch (e) {
       return new Response(JSON.stringify({ ok: false, error: e.message }), {
