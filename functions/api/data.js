@@ -153,6 +153,7 @@ export async function onRequest(context) {
       } catch (_) {}
     }
     if (!data) data = JSON.parse(JSON.stringify(DATA));
+    (data.projects||[]).forEach(p=>{(p.images||[]).forEach((s,i,a)=>{if(s&&s.includes('res.cloudinary.com'))a[i]='/api/proxy?img='+encodeURIComponent(s)})});
     return new Response(JSON.stringify(data), {
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
     });
