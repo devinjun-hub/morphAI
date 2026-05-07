@@ -141,19 +141,6 @@ const DATA = {
   ]
 };
 
-function proxyImages(data) {
-  if (!data || !Array.isArray(data.projects)) return data;
-  data.projects.forEach(p => {
-    if (!Array.isArray(p.images)) return;
-    p.images = p.images.map(src => {
-      if (src && src.includes('res.cloudinary.com'))
-        return '/api/proxy-image?url=' + encodeURIComponent(src);
-      return src;
-    });
-  });
-  return data;
-}
-
 export async function onRequest(context) {
   const { request, env } = context;
 
@@ -166,7 +153,6 @@ export async function onRequest(context) {
       } catch (_) {}
     }
     if (!data) data = JSON.parse(JSON.stringify(DATA));
-    proxyImages(data);
     return new Response(JSON.stringify(data), {
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
     });
