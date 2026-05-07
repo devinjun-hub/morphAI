@@ -1,0 +1,16 @@
+name = "morphai"
+compatibility_date = "2025-04-01"
+
+pages_build_output_dir = "."
+
+[env.production]
+# KV namespace for data persistence
+# Create in Cloudflare Dashboard: Workers & Pages > KV > Create namespace "MORPHAI_KV"
+# Then bind it in Pages project: Settings > Functions > KV namespace bindings
+# Variable name: MORPHAI_KV, KV namespace: (select the one you created)
+
+# Environment variables for Cloudinary image upload (optional)
+# Set in: Cloudflare Pages > your project > Settings > Environment variables
+# CLOUDINARY_CLOUD_NAME = your_cloud_name
+# CLOUDINARY_API_KEY = your_api_key
+# CLOUDINARY_API_SECRET = your_api_secret

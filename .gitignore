@@ -1,6 +1,8 @@
 node_modules/
 data/site-data.json
+data/clean-data.json
 .env
 .agents/
 .claude/
 server.log
+.wrangler/
