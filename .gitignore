@@ -6,3 +6,4 @@ data/clean-data.json
 .claude/
 server.log
 .wrangler/
+images/
